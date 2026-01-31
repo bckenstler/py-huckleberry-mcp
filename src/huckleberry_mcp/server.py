@@ -88,17 +88,6 @@ async def list_tools() -> list[Tool]:
             }
         ),
         Tool(
-            name="get_sleep_status",
-            description="Get the current status of sleep tracking for a child",
-            inputSchema={
-                "type": "object",
-                "properties": {
-                    "child_uid": {"type": "string", "description": "The child's unique identifier"}
-                },
-                "required": ["child_uid"]
-            }
-        ),
-        Tool(
             name="get_sleep_history",
             description="Get sleep history for a child within a date range",
             inputSchema={
@@ -181,31 +170,6 @@ async def list_tools() -> list[Tool]:
             }
         ),
         Tool(
-            name="log_bottle_feeding",
-            description="Log a bottle feeding without using a timer",
-            inputSchema={
-                "type": "object",
-                "properties": {
-                    "child_uid": {"type": "string", "description": "The child's unique identifier"},
-                    "amount": {"type": "number", "description": "Amount fed"},
-                    "bottle_type": {"type": "string", "description": "Type of bottle feeding", "enum": ["formula", "breast_milk", "mixed"], "default": "formula"},
-                    "units": {"type": "string", "description": "Units of measurement", "enum": ["oz", "ml"], "default": "oz"}
-                },
-                "required": ["child_uid", "amount"]
-            }
-        ),
-        Tool(
-            name="get_feeding_status",
-            description="Get the current status of feeding tracking for a child",
-            inputSchema={
-                "type": "object",
-                "properties": {
-                    "child_uid": {"type": "string", "description": "The child's unique identifier"}
-                },
-                "required": ["child_uid"]
-            }
-        ),
-        Tool(
             name="get_feeding_history",
             description="Get feeding history for a child within a date range",
             inputSchema={
@@ -228,8 +192,12 @@ async def list_tools() -> list[Tool]:
                 "properties": {
                     "child_uid": {"type": "string", "description": "The child's unique identifier"},
                     "mode": {"type": "string", "description": "Diaper mode", "enum": ["pee", "poo", "both", "dry"], "default": "both"},
-                    "poo_color": {"type": "string", "description": "Color of poo if present", "enum": ["brown", "yellow", "green", "black"]},
-                    "consistency": {"type": "string", "description": "Consistency of poo if present", "enum": ["soft", "firm", "watery", "hard"]}
+                    "pee_amount": {"type": "string", "description": "Pee amount", "enum": ["little", "medium", "big"]},
+                    "poo_amount": {"type": "string", "description": "Poo amount", "enum": ["little", "medium", "big"]},
+                    "color": {"type": "string", "description": "Poo color if present", "enum": ["yellow", "brown", "black", "green", "red", "gray"]},
+                    "consistency": {"type": "string", "description": "Poo consistency if present", "enum": ["solid", "loose", "runny", "mucousy", "hard", "pebbles", "diarrhea"]},
+                    "diaper_rash": {"type": "boolean", "description": "Whether baby has diaper rash", "default": False},
+                    "notes": {"type": "string", "description": "Optional notes about the diaper change"}
                 },
                 "required": ["child_uid"]
             }
@@ -258,7 +226,7 @@ async def list_tools() -> list[Tool]:
                     "child_uid": {"type": "string", "description": "The child's unique identifier"},
                     "weight": {"type": "number", "description": "Weight (lbs if imperial, kg if metric)"},
                     "height": {"type": "number", "description": "Height (inches if imperial, cm if metric)"},
-                    "head_circumference": {"type": "number", "description": "Head circumference (inches if imperial, cm if metric)"},
+                    "head": {"type": "number", "description": "Head circumference (inches if imperial, cm if metric)"},
                     "units": {"type": "string", "description": "Measurement system", "enum": ["imperial", "metric"], "default": "imperial"}
                 },
                 "required": ["child_uid"]
@@ -310,8 +278,6 @@ async def call_tool(name: str, arguments: dict) -> list[TextContent]:
             result = await sleep.complete_sleep(arguments["child_uid"])
         elif name == "cancel_sleep":
             result = await sleep.cancel_sleep(arguments["child_uid"])
-        elif name == "get_sleep_status":
-            result = await sleep.get_sleep_status(arguments["child_uid"])
         elif name == "get_sleep_history":
             result = await sleep.get_sleep_history(
                 arguments["child_uid"],
@@ -335,15 +301,6 @@ async def call_tool(name: str, arguments: dict) -> list[TextContent]:
             result = await feeding.complete_feeding(arguments["child_uid"])
         elif name == "cancel_feeding":
             result = await feeding.cancel_feeding(arguments["child_uid"])
-        elif name == "log_bottle_feeding":
-            result = await feeding.log_bottle_feeding(
-                arguments["child_uid"],
-                arguments["amount"],
-                arguments.get("bottle_type", "formula"),
-                arguments.get("units", "oz")
-            )
-        elif name == "get_feeding_status":
-            result = await feeding.get_feeding_status(arguments["child_uid"])
         elif name == "get_feeding_history":
             result = await feeding.get_feeding_history(
                 arguments["child_uid"],
@@ -356,10 +313,12 @@ async def call_tool(name: str, arguments: dict) -> list[TextContent]:
             result = await diaper.log_diaper(
                 arguments["child_uid"],
                 arguments.get("mode", "both"),
-                arguments.get("has_pee", False),
-                arguments.get("has_poo", False),
-                arguments.get("poo_color"),
-                arguments.get("consistency")
+                arguments.get("pee_amount"),
+                arguments.get("poo_amount"),
+                arguments.get("color"),
+                arguments.get("consistency"),
+                arguments.get("diaper_rash", False),
+                arguments.get("notes")
             )
         elif name == "get_diaper_history":
             result = await diaper.get_diaper_history(
@@ -374,7 +333,7 @@ async def call_tool(name: str, arguments: dict) -> list[TextContent]:
                 arguments["child_uid"],
                 arguments.get("weight"),
                 arguments.get("height"),
-                arguments.get("head_circumference"),
+                arguments.get("head"),
                 arguments.get("units", "imperial")
             )
         elif name == "get_latest_growth":

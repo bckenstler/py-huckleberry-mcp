@@ -1,9 +1,15 @@
 """Sleep tracking tools for Huckleberry MCP server."""
 
 from typing import Any, Dict, List, Optional
-from datetime import datetime
+from datetime import datetime, timezone, timedelta
 from ..auth import get_authenticated_api
 from .children import validate_child_uid
+
+
+def iso_to_timestamp(iso_date: str) -> int:
+    """Convert ISO date string (YYYY-MM-DD) to Unix timestamp."""
+    dt = datetime.fromisoformat(iso_date).replace(tzinfo=timezone.utc)
+    return int(dt.timestamp())
 
 
 async def start_sleep(child_uid: str) -> Dict[str, Any]:
@@ -20,15 +26,8 @@ async def start_sleep(child_uid: str) -> Dict[str, Any]:
         await validate_child_uid(child_uid)
         api = await get_authenticated_api()
 
-        # Check if there's already an active sleep session
-        status = await api.get_sleep_timer_status(child_uid)
-        if status and status.get("isActive"):
-            raise ValueError(
-                "Sleep session already active. Use pause_sleep, complete_sleep, "
-                "or cancel_sleep to manage the existing session."
-            )
-
-        await api.start_sleep_timer(child_uid)
+        # Start sleep timer
+        api.start_sleep(child_uid)
 
         return {
             "success": True,
@@ -56,19 +55,8 @@ async def pause_sleep(child_uid: str) -> Dict[str, Any]:
         await validate_child_uid(child_uid)
         api = await get_authenticated_api()
 
-        # Check if there's an active sleep session
-        status = await api.get_sleep_timer_status(child_uid)
-        if not status or not status.get("isActive"):
-            raise ValueError(
-                "No active sleep session to pause. Use start_sleep to begin tracking."
-            )
-
-        if status.get("isPaused"):
-            raise ValueError(
-                "Sleep session is already paused. Use resume_sleep to continue."
-            )
-
-        await api.pause_sleep_timer(child_uid)
+        # Pause sleep timer
+        api.pause_sleep(child_uid)
 
         return {
             "success": True,
@@ -96,19 +84,8 @@ async def resume_sleep(child_uid: str) -> Dict[str, Any]:
         await validate_child_uid(child_uid)
         api = await get_authenticated_api()
 
-        # Check if there's a paused sleep session
-        status = await api.get_sleep_timer_status(child_uid)
-        if not status or not status.get("isActive"):
-            raise ValueError(
-                "No active sleep session to resume. Use start_sleep to begin tracking."
-            )
-
-        if not status.get("isPaused"):
-            raise ValueError(
-                "Sleep session is not paused. Use pause_sleep to pause it first."
-            )
-
-        await api.resume_sleep_timer(child_uid)
+        # Resume sleep timer
+        api.resume_sleep(child_uid)
 
         return {
             "success": True,
@@ -136,14 +113,8 @@ async def complete_sleep(child_uid: str) -> Dict[str, Any]:
         await validate_child_uid(child_uid)
         api = await get_authenticated_api()
 
-        # Check if there's an active sleep session
-        status = await api.get_sleep_timer_status(child_uid)
-        if not status or not status.get("isActive"):
-            raise ValueError(
-                "No active sleep session to complete. Use start_sleep to begin tracking."
-            )
-
-        await api.complete_sleep_timer(child_uid)
+        # Complete sleep timer
+        api.complete_sleep(child_uid)
 
         return {
             "success": True,
@@ -171,14 +142,8 @@ async def cancel_sleep(child_uid: str) -> Dict[str, Any]:
         await validate_child_uid(child_uid)
         api = await get_authenticated_api()
 
-        # Check if there's an active sleep session
-        status = await api.get_sleep_timer_status(child_uid)
-        if not status or not status.get("isActive"):
-            raise ValueError(
-                "No active sleep session to cancel."
-            )
-
-        await api.cancel_sleep_timer(child_uid)
+        # Cancel sleep timer
+        api.cancel_sleep(child_uid)
 
         return {
             "success": True,
@@ -190,40 +155,6 @@ async def cancel_sleep(child_uid: str) -> Dict[str, Any]:
         raise
     except Exception as e:
         raise Exception(f"Failed to cancel sleep session: {str(e)}")
-
-
-async def get_sleep_status(child_uid: str) -> Dict[str, Any]:
-    """
-    Get the current status of sleep tracking for a child.
-
-    Args:
-        child_uid: The child's unique identifier
-
-    Returns:
-        Current sleep timer status including active state and duration
-    """
-    try:
-        await validate_child_uid(child_uid)
-        api = await get_authenticated_api()
-
-        status = await api.get_sleep_timer_status(child_uid)
-
-        if not status or not status.get("isActive"):
-            return {
-                "is_active": False,
-                "message": "No active sleep session"
-            }
-
-        return {
-            "is_active": True,
-            "is_paused": status.get("isPaused", False),
-            "start_time": status.get("startTime"),
-            "elapsed_seconds": status.get("elapsedSeconds", 0),
-            "message": "Sleep session active"
-        }
-
-    except Exception as e:
-        raise Exception(f"Failed to get sleep status: {str(e)}")
 
 
 async def get_sleep_history(
@@ -246,19 +177,30 @@ async def get_sleep_history(
         await validate_child_uid(child_uid)
         api = await get_authenticated_api()
 
-        history = await api.get_sleep_history(
-            child_uid,
-            start_date=start_date,
-            end_date=end_date
-        )
+        # Default to last 7 days if no dates provided
+        if not start_date:
+            start_timestamp = int((datetime.now(timezone.utc) - timedelta(days=7)).timestamp())
+        else:
+            start_timestamp = iso_to_timestamp(start_date)
+
+        if not end_date:
+            end_timestamp = int(datetime.now(timezone.utc).timestamp())
+        else:
+            end_timestamp = iso_to_timestamp(end_date)
+
+        # Use get_sleep_intervals which returns list of dicts with 'start', 'end', 'duration'
+        intervals = api.get_sleep_intervals(child_uid, start_timestamp, end_timestamp)
 
         result = []
-        for event in history:
+        for interval in intervals:
+            # Convert timestamps to ISO format
+            start_time = datetime.fromtimestamp(interval["start"], tz=timezone.utc).isoformat()
+            end_time = datetime.fromtimestamp(interval["end"], tz=timezone.utc).isoformat() if "end" in interval else None
+
             result.append({
-                "start_time": event.get("startTime"),
-                "end_time": event.get("endTime"),
-                "duration_minutes": event.get("durationMinutes"),
-                "notes": event.get("notes"),
+                "start_time": start_time,
+                "end_time": end_time,
+                "duration_minutes": interval.get("duration", 0),
             })
 
         return result

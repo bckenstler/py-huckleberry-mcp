@@ -1,16 +1,22 @@
 """Growth tracking tools for Huckleberry MCP server."""
 
 from typing import Any, Dict, List, Optional
-from datetime import datetime
+from datetime import datetime, timezone, timedelta
 from ..auth import get_authenticated_api
 from .children import validate_child_uid
+
+
+def iso_to_timestamp(iso_date: str) -> int:
+    """Convert ISO date string (YYYY-MM-DD) to Unix timestamp."""
+    dt = datetime.fromisoformat(iso_date).replace(tzinfo=timezone.utc)
+    return int(dt.timestamp())
 
 
 async def log_growth(
     child_uid: str,
     weight: Optional[float] = None,
     height: Optional[float] = None,
-    head_circumference: Optional[float] = None,
+    head: Optional[float] = None,
     units: str = "imperial"
 ) -> Dict[str, Any]:
     """
@@ -20,7 +26,7 @@ async def log_growth(
         child_uid: The child's unique identifier
         weight: Weight measurement (lbs if imperial, kg if metric)
         height: Height measurement (inches if imperial, cm if metric)
-        head_circumference: Head circumference (inches if imperial, cm if metric)
+        head: Head circumference (inches if imperial, cm if metric)
         units: Measurement system ("imperial" or "metric")
 
     Returns:
@@ -34,18 +40,18 @@ async def log_growth(
                 f"Invalid units '{units}'. Must be 'imperial' or 'metric'."
             )
 
-        if not any([weight, height, head_circumference]):
+        if not any([weight, height, head]):
             raise ValueError(
-                "At least one measurement (weight, height, or head_circumference) must be provided."
+                "At least one measurement (weight, height, or head) must be provided."
             )
 
         api = await get_authenticated_api()
 
-        await api.log_growth_measurement(
+        api.log_growth(
             child_uid,
             weight=weight,
             height=height,
-            head_circumference=head_circumference,
+            head=head,
             units=units
         )
 
@@ -56,16 +62,16 @@ async def log_growth(
         if height is not None:
             unit = "in" if units == "imperial" else "cm"
             measurements.append(f"height: {height}{unit}")
-        if head_circumference is not None:
+        if head is not None:
             unit = "in" if units == "imperial" else "cm"
-            measurements.append(f"head: {head_circumference}{unit}")
+            measurements.append(f"head: {head}{unit}")
 
         return {
             "success": True,
             "message": f"Logged growth measurements ({', '.join(measurements)}) for child {child_uid}",
             "weight": weight,
             "height": height,
-            "head_circumference": head_circumference,
+            "head": head,
             "units": units,
             "timestamp": datetime.now().isoformat()
         }
@@ -90,20 +96,21 @@ async def get_latest_growth(child_uid: str) -> Dict[str, Any]:
         await validate_child_uid(child_uid)
         api = await get_authenticated_api()
 
-        latest = await api.get_latest_growth_measurement(child_uid)
+        growth_data = api.get_growth_data(child_uid)
 
-        if not latest:
+        if not growth_data.get("weight") and not growth_data.get("height") and not growth_data.get("head"):
             return {
                 "message": "No growth measurements found for this child"
             }
 
         return {
-            "timestamp": latest.get("timestamp"),
-            "weight": latest.get("weight"),
-            "height": latest.get("height"),
-            "head_circumference": latest.get("headCircumference"),
-            "units": latest.get("units"),
-            "age_days": latest.get("ageDays"),
+            "weight": growth_data.get("weight"),
+            "height": growth_data.get("height"),
+            "head": growth_data.get("head"),
+            "weight_units": growth_data.get("weight_units"),
+            "height_units": growth_data.get("height_units"),
+            "head_units": growth_data.get("head_units"),
+            "timestamp": growth_data.get("timestamp_sec"),
         }
 
     except Exception as e:
@@ -130,22 +137,30 @@ async def get_growth_history(
         await validate_child_uid(child_uid)
         api = await get_authenticated_api()
 
-        history = await api.get_growth_history(
-            child_uid,
-            start_date=start_date,
-            end_date=end_date
-        )
+        # Default to last 30 days if no dates provided
+        if not start_date:
+            start_timestamp = int((datetime.now(timezone.utc) - timedelta(days=30)).timestamp())
+        else:
+            start_timestamp = iso_to_timestamp(start_date)
+
+        if not end_date:
+            end_timestamp = int(datetime.now(timezone.utc).timestamp())
+        else:
+            end_timestamp = iso_to_timestamp(end_date)
+
+        # Use get_health_entries which returns growth/health measurements
+        entries = api.get_health_entries(child_uid, start_timestamp, end_timestamp)
 
         result = []
-        for event in history:
+        for entry in entries:
+            # Convert timestamp to ISO format
+            timestamp = datetime.fromtimestamp(entry["start"], tz=timezone.utc).isoformat()
+
             result.append({
-                "timestamp": event.get("timestamp"),
-                "weight": event.get("weight"),
-                "height": event.get("height"),
-                "head_circumference": event.get("headCircumference"),
-                "units": event.get("units"),
-                "age_days": event.get("ageDays"),
-                "notes": event.get("notes"),
+                "timestamp": timestamp,
+                "weight": entry.get("weight"),
+                "height": entry.get("height"),
+                "head": entry.get("head"),
             })
 
         return result

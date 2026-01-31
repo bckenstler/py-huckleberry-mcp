@@ -1,9 +1,15 @@
 """Feeding tracking tools for Huckleberry MCP server."""
 
 from typing import Any, Dict, List, Optional
-from datetime import datetime
+from datetime import datetime, timezone, timedelta
 from ..auth import get_authenticated_api
 from .children import validate_child_uid
+
+
+def iso_to_timestamp(iso_date: str) -> int:
+    """Convert ISO date string (YYYY-MM-DD) to Unix timestamp."""
+    dt = datetime.fromisoformat(iso_date).replace(tzinfo=timezone.utc)
+    return int(dt.timestamp())
 
 
 async def start_breastfeeding(child_uid: str, side: str) -> Dict[str, Any]:
@@ -27,15 +33,8 @@ async def start_breastfeeding(child_uid: str, side: str) -> Dict[str, Any]:
 
         api = await get_authenticated_api()
 
-        # Check if there's already an active feeding session
-        status = await api.get_feeding_timer_status(child_uid)
-        if status and status.get("isActive"):
-            raise ValueError(
-                "Feeding session already active. Use pause_feeding, complete_feeding, "
-                "or cancel_feeding to manage the existing session."
-            )
-
-        await api.start_breastfeeding_timer(child_uid, side=side.lower())
+        # Start feeding timer
+        api.start_feeding(child_uid, side=side.lower())
 
         return {
             "success": True,
@@ -64,19 +63,8 @@ async def pause_feeding(child_uid: str) -> Dict[str, Any]:
         await validate_child_uid(child_uid)
         api = await get_authenticated_api()
 
-        # Check if there's an active feeding session
-        status = await api.get_feeding_timer_status(child_uid)
-        if not status or not status.get("isActive"):
-            raise ValueError(
-                "No active feeding session to pause. Use start_breastfeeding to begin tracking."
-            )
-
-        if status.get("isPaused"):
-            raise ValueError(
-                "Feeding session is already paused. Use resume_feeding to continue."
-            )
-
-        await api.pause_feeding_timer(child_uid)
+        # Pause feeding timer
+        api.pause_feeding(child_uid)
 
         return {
             "success": True,
@@ -104,19 +92,8 @@ async def resume_feeding(child_uid: str) -> Dict[str, Any]:
         await validate_child_uid(child_uid)
         api = await get_authenticated_api()
 
-        # Check if there's a paused feeding session
-        status = await api.get_feeding_timer_status(child_uid)
-        if not status or not status.get("isActive"):
-            raise ValueError(
-                "No active feeding session to resume. Use start_breastfeeding to begin tracking."
-            )
-
-        if not status.get("isPaused"):
-            raise ValueError(
-                "Feeding session is not paused. Use pause_feeding to pause it first."
-            )
-
-        await api.resume_feeding_timer(child_uid)
+        # Resume feeding timer
+        api.resume_feeding(child_uid)
 
         return {
             "success": True,
@@ -144,22 +121,12 @@ async def switch_feeding_side(child_uid: str) -> Dict[str, Any]:
         await validate_child_uid(child_uid)
         api = await get_authenticated_api()
 
-        # Check if there's an active feeding session
-        status = await api.get_feeding_timer_status(child_uid)
-        if not status or not status.get("isActive"):
-            raise ValueError(
-                "No active feeding session. Use start_breastfeeding to begin tracking."
-            )
-
-        await api.switch_breastfeeding_side(child_uid)
-
-        current_side = status.get("currentSide", "unknown")
-        new_side = "right" if current_side == "left" else "left"
+        # Switch feeding side
+        api.switch_feeding_side(child_uid)
 
         return {
             "success": True,
-            "message": f"Switched from {current_side} to {new_side} side",
-            "new_side": new_side,
+            "message": "Switched feeding side",
             "timestamp": datetime.now().isoformat()
         }
 
@@ -183,14 +150,8 @@ async def complete_feeding(child_uid: str) -> Dict[str, Any]:
         await validate_child_uid(child_uid)
         api = await get_authenticated_api()
 
-        # Check if there's an active feeding session
-        status = await api.get_feeding_timer_status(child_uid)
-        if not status or not status.get("isActive"):
-            raise ValueError(
-                "No active feeding session to complete. Use start_breastfeeding to begin tracking."
-            )
-
-        await api.complete_feeding_timer(child_uid)
+        # Complete feeding timer
+        api.complete_feeding(child_uid)
 
         return {
             "success": True,
@@ -218,14 +179,8 @@ async def cancel_feeding(child_uid: str) -> Dict[str, Any]:
         await validate_child_uid(child_uid)
         api = await get_authenticated_api()
 
-        # Check if there's an active feeding session
-        status = await api.get_feeding_timer_status(child_uid)
-        if not status or not status.get("isActive"):
-            raise ValueError(
-                "No active feeding session to cancel."
-            )
-
-        await api.cancel_feeding_timer(child_uid)
+        # Cancel feeding timer
+        api.cancel_feeding(child_uid)
 
         return {
             "success": True,
@@ -239,95 +194,6 @@ async def cancel_feeding(child_uid: str) -> Dict[str, Any]:
         raise Exception(f"Failed to cancel feeding session: {str(e)}")
 
 
-async def log_bottle_feeding(
-    child_uid: str,
-    amount: float,
-    bottle_type: str = "formula",
-    units: str = "oz"
-) -> Dict[str, Any]:
-    """
-    Log a bottle feeding without using a timer.
-
-    Args:
-        child_uid: The child's unique identifier
-        amount: Amount fed
-        bottle_type: Type of bottle feeding ("formula", "breast_milk", "mixed")
-        units: Units of measurement ("oz" or "ml")
-
-    Returns:
-        Status message confirming bottle feeding logged
-    """
-    try:
-        await validate_child_uid(child_uid)
-
-        if bottle_type not in ["formula", "breast_milk", "mixed"]:
-            raise ValueError(
-                f"Invalid bottle_type '{bottle_type}'. "
-                "Must be 'formula', 'breast_milk', or 'mixed'."
-            )
-
-        if units not in ["oz", "ml"]:
-            raise ValueError(
-                f"Invalid units '{units}'. Must be 'oz' or 'ml'."
-            )
-
-        api = await get_authenticated_api()
-
-        await api.log_bottle_feeding(
-            child_uid,
-            amount=amount,
-            bottle_type=bottle_type,
-            units=units
-        )
-
-        return {
-            "success": True,
-            "message": f"Logged {amount}{units} {bottle_type} bottle feeding for child {child_uid}",
-            "amount": amount,
-            "units": units,
-            "bottle_type": bottle_type,
-            "timestamp": datetime.now().isoformat()
-        }
-
-    except ValueError as e:
-        raise
-    except Exception as e:
-        raise Exception(f"Failed to log bottle feeding: {str(e)}")
-
-
-async def get_feeding_status(child_uid: str) -> Dict[str, Any]:
-    """
-    Get the current status of feeding tracking for a child.
-
-    Args:
-        child_uid: The child's unique identifier
-
-    Returns:
-        Current feeding timer status including active state and duration
-    """
-    try:
-        await validate_child_uid(child_uid)
-        api = await get_authenticated_api()
-
-        status = await api.get_feeding_timer_status(child_uid)
-
-        if not status or not status.get("isActive"):
-            return {
-                "is_active": False,
-                "message": "No active feeding session"
-            }
-
-        return {
-            "is_active": True,
-            "is_paused": status.get("isPaused", False),
-            "current_side": status.get("currentSide"),
-            "start_time": status.get("startTime"),
-            "elapsed_seconds": status.get("elapsedSeconds", 0),
-            "message": "Feeding session active"
-        }
-
-    except Exception as e:
-        raise Exception(f"Failed to get feeding status: {str(e)}")
 
 
 async def get_feeding_history(
@@ -350,23 +216,30 @@ async def get_feeding_history(
         await validate_child_uid(child_uid)
         api = await get_authenticated_api()
 
-        history = await api.get_feeding_history(
-            child_uid,
-            start_date=start_date,
-            end_date=end_date
-        )
+        # Default to last 7 days if no dates provided
+        if not start_date:
+            start_timestamp = int((datetime.now(timezone.utc) - timedelta(days=7)).timestamp())
+        else:
+            start_timestamp = iso_to_timestamp(start_date)
+
+        if not end_date:
+            end_timestamp = int(datetime.now(timezone.utc).timestamp())
+        else:
+            end_timestamp = iso_to_timestamp(end_date)
+
+        # Use get_feed_intervals which returns list of dicts with 'start', 'leftDuration', 'rightDuration'
+        intervals = api.get_feed_intervals(child_uid, start_timestamp, end_timestamp)
 
         result = []
-        for event in history:
+        for interval in intervals:
+            # Convert timestamp to ISO format
+            start_time = datetime.fromtimestamp(interval["start"], tz=timezone.utc).isoformat()
+
             result.append({
-                "start_time": event.get("startTime"),
-                "end_time": event.get("endTime"),
-                "type": event.get("type"),
-                "amount": event.get("amount"),
-                "units": event.get("units"),
-                "sides": event.get("sides"),
-                "duration_minutes": event.get("durationMinutes"),
-                "notes": event.get("notes"),
+                "start_time": start_time,
+                "left_duration_minutes": interval.get("leftDuration", 0),
+                "right_duration_minutes": interval.get("rightDuration", 0),
+                "is_multi_entry": interval.get("is_multi_entry", False),
             })
 
         return result
