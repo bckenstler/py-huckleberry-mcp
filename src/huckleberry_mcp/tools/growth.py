@@ -1,5 +1,7 @@
 """Growth tracking tools for Huckleberry MCP server."""
 
+import time
+import uuid
 from typing import Any, Dict, List, Optional
 from datetime import datetime, timezone, timedelta
 from ..auth import get_authenticated_api
@@ -28,12 +30,38 @@ def iso_to_timestamp(iso_date: str, user_timezone=None) -> int:
     return int(dt.timestamp())
 
 
+def iso_datetime_to_timestamp(iso_datetime: str, user_timezone=None) -> int:
+    """Convert ISO datetime string to Unix timestamp (seconds).
+
+    Args:
+        iso_datetime: ISO datetime string (e.g., "2026-01-25T08:15:00" or "2026-01-25T08:15:00Z")
+        user_timezone: ZoneInfo object representing user's timezone. If provided and iso_datetime
+                       has no timezone, interprets the datetime as being in this timezone.
+
+    Returns:
+        Unix timestamp in seconds
+    """
+    dt = datetime.fromisoformat(iso_datetime.replace('Z', '+00:00'))
+
+    # If no timezone specified in the input string, use user's configured timezone
+    if dt.tzinfo is None:
+        if user_timezone is not None:
+            # Interpret as user's local time
+            dt = dt.replace(tzinfo=user_timezone)
+        else:
+            # Fallback to UTC if no user timezone provided
+            dt = dt.replace(tzinfo=timezone.utc)
+
+    return int(dt.timestamp())
+
+
 async def log_growth(
     child_uid: str,
     weight: Optional[float] = None,
     height: Optional[float] = None,
     head: Optional[float] = None,
-    units: str = "imperial"
+    units: str = "imperial",
+    timestamp: Optional[str] = None
 ) -> Dict[str, Any]:
     """
     Log growth measurements.
@@ -44,6 +72,7 @@ async def log_growth(
         height: Height measurement (inches if imperial, cm if metric)
         head: Head circumference (inches if imperial, cm if metric)
         units: Measurement system ("imperial" or "metric")
+        timestamp: Optional timestamp in ISO format for retroactive logging. If not provided, uses current time.
 
     Returns:
         Status message confirming growth measurements logged
@@ -63,13 +92,65 @@ async def log_growth(
 
         api = await get_authenticated_api()
 
-        api.log_growth(
-            child_uid,
-            weight=weight,
-            height=height,
-            head=head,
-            units=units
-        )
+        # Determine timestamp to use
+        if timestamp:
+            user_timezone = api._timezone
+            measurement_time = iso_datetime_to_timestamp(timestamp, user_timezone)
+        else:
+            measurement_time = time.time()
+
+        # Access Firestore client directly for custom timestamp support
+        client = api._get_firestore_client()
+        health_ref = client.collection("health").document(child_uid)
+
+        # Create interval ID (timestamp in ms + random suffix)
+        interval_timestamp_ms = int(measurement_time * 1000)
+        interval_id = f"{interval_timestamp_ms}-{uuid.uuid4().hex[:20]}"
+
+        # Build growth entry matching Huckleberry app structure
+        growth_entry = {
+            "_id": interval_id,
+            "type": "health",
+            "mode": "growth",
+            "start": measurement_time,
+            "lastUpdated": measurement_time,
+            "offset": api._get_timezone_offset_minutes(),
+            "isNight": False,
+            "multientry_key": None,
+        }
+
+        # Add measurements with proper unit fields
+        if units == "metric":
+            if weight is not None:
+                growth_entry["weight"] = float(weight)
+                growth_entry["weightUnits"] = "kg"
+            if height is not None:
+                growth_entry["height"] = float(height)
+                growth_entry["heightUnits"] = "cm"
+            if head is not None:
+                growth_entry["head"] = float(head)
+                growth_entry["headUnits"] = "hcm"
+        else:  # imperial
+            if weight is not None:
+                growth_entry["weight"] = float(weight)
+                growth_entry["weightUnits"] = "lbs"
+            if height is not None:
+                growth_entry["height"] = float(height)
+                growth_entry["heightUnits"] = "in"
+            if head is not None:
+                growth_entry["head"] = float(head)
+                growth_entry["headUnits"] = "hin"
+
+        # Create interval document in health/{child_uid}/data subcollection
+        health_data_ref = health_ref.collection("data").document(interval_id)
+        health_data_ref.set(growth_entry)
+
+        # Update prefs.lastGrowthEntry and timestamps
+        health_ref.update({
+            "prefs.lastGrowthEntry": growth_entry,
+            "prefs.timestamp": {"seconds": measurement_time},
+            "prefs.local_timestamp": measurement_time,
+        })
 
         measurements = []
         if weight is not None:
@@ -82,6 +163,9 @@ async def log_growth(
             unit = "in" if units == "imperial" else "cm"
             measurements.append(f"head: {head}{unit}")
 
+        # Convert timestamp for response
+        timestamp_dt = datetime.fromtimestamp(measurement_time, tz=timezone.utc)
+
         return {
             "success": True,
             "message": f"Logged growth measurements ({', '.join(measurements)}) for child {child_uid}",
@@ -89,7 +173,7 @@ async def log_growth(
             "height": height,
             "head": head,
             "units": units,
-            "timestamp": datetime.now().isoformat()
+            "timestamp": timestamp_dt.isoformat()
         }
 
     except ValueError as e:

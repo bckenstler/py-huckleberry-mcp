@@ -235,7 +235,7 @@ Get feeding history for a child within a date range (defaults to last 7 days).
 ### Diaper Tracking
 
 #### `log_diaper`
-Log a diaper change with details.
+Log a diaper change with details. Supports retroactive logging with optional timestamp.
 
 **Parameters**:
 - `child_uid` (string, required): The child's unique identifier
@@ -246,8 +246,13 @@ Log a diaper change with details.
 - `consistency` (string, optional): Poo consistency if present ("solid", "loose", "runny", "mucousy", "hard", "pebbles", "diarrhea")
 - `diaper_rash` (boolean, optional): Whether baby has diaper rash, default: false
 - `notes` (string, optional): Optional notes about the diaper change
+- `timestamp` (string, optional): Timestamp in ISO format for retroactive logging. If not provided, uses current time.
 
-**Example**: "Log a diaper change with pee and poo"
+**Timezone Note**: Times without timezone info are interpreted using your `HUCKLEBERRY_TIMEZONE` setting.
+
+**Examples**:
+- "Log a diaper change with pee and poo"
+- "Log a wet diaper from 2 hours ago" (with retroactive timestamp)
 
 #### `get_diaper_history`
 Get diaper change history for a child within a date range (defaults to last 7 days).
@@ -264,7 +269,7 @@ Get diaper change history for a child within a date range (defaults to last 7 da
 ### Growth Tracking
 
 #### `log_growth`
-Log growth measurements (weight, height, head circumference).
+Log growth measurements (weight, height, head circumference). Supports retroactive logging with optional timestamp.
 
 **Parameters**:
 - `child_uid` (string, required): The child's unique identifier
@@ -272,8 +277,13 @@ Log growth measurements (weight, height, head circumference).
 - `height` (number, optional): Height (inches if imperial, cm if metric)
 - `head` (number, optional): Head circumference (inches if imperial, cm if metric)
 - `units` (string, optional): Measurement system ("imperial" or "metric"), default: "imperial"
+- `timestamp` (string, optional): Timestamp in ISO format for retroactive logging. If not provided, uses current time.
 
-**Example**: "Log weight of 12.5 lbs and height of 24 inches"
+**Timezone Note**: Times without timezone info are interpreted using your `HUCKLEBERRY_TIMEZONE` setting.
+
+**Examples**:
+- "Log weight of 12.5 lbs and height of 24 inches"
+- "Log weight measurement from yesterday's doctor visit" (with retroactive timestamp)
 
 #### `get_latest_growth`
 Get the latest growth measurements for a child.

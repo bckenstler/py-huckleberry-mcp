@@ -1,5 +1,7 @@
 """Diaper tracking tools for Huckleberry MCP server."""
 
+import time
+import uuid
 from typing import Any, Dict, List, Optional
 from datetime import datetime, timezone, timedelta
 from ..auth import get_authenticated_api
@@ -28,6 +30,31 @@ def iso_to_timestamp(iso_date: str, user_timezone=None) -> int:
     return int(dt.timestamp())
 
 
+def iso_datetime_to_timestamp(iso_datetime: str, user_timezone=None) -> int:
+    """Convert ISO datetime string to Unix timestamp (seconds).
+
+    Args:
+        iso_datetime: ISO datetime string (e.g., "2026-01-25T08:15:00" or "2026-01-25T08:15:00Z")
+        user_timezone: ZoneInfo object representing user's timezone. If provided and iso_datetime
+                       has no timezone, interprets the datetime as being in this timezone.
+
+    Returns:
+        Unix timestamp in seconds
+    """
+    dt = datetime.fromisoformat(iso_datetime.replace('Z', '+00:00'))
+
+    # If no timezone specified in the input string, use user's configured timezone
+    if dt.tzinfo is None:
+        if user_timezone is not None:
+            # Interpret as user's local time
+            dt = dt.replace(tzinfo=user_timezone)
+        else:
+            # Fallback to UTC if no user timezone provided
+            dt = dt.replace(tzinfo=timezone.utc)
+
+    return int(dt.timestamp())
+
+
 async def log_diaper(
     child_uid: str,
     mode: str = "both",
@@ -36,7 +63,8 @@ async def log_diaper(
     color: Optional[str] = None,
     consistency: Optional[str] = None,
     diaper_rash: bool = False,
-    notes: Optional[str] = None
+    notes: Optional[str] = None,
+    timestamp: Optional[str] = None
 ) -> Dict[str, Any]:
     """
     Log a diaper change.
@@ -50,6 +78,7 @@ async def log_diaper(
         consistency: Consistency of poo ("solid", "loose", "runny", "mucousy", "hard", "pebbles", "diarrhea")
         diaper_rash: Whether baby has diaper rash
         notes: Optional notes about this diaper change
+        timestamp: Optional timestamp in ISO format for retroactive logging. If not provided, uses current time.
 
     Returns:
         Status message confirming diaper logged
@@ -93,16 +122,63 @@ async def log_diaper(
 
         api = await get_authenticated_api()
 
-        api.log_diaper(
-            child_uid,
-            mode=mode,
-            pee_amount=pee_amount,
-            poo_amount=poo_amount,
-            color=color,
-            consistency=consistency,
-            diaper_rash=diaper_rash,
-            notes=notes
-        )
+        # Determine timestamp to use
+        if timestamp:
+            user_timezone = api._timezone
+            change_time = iso_datetime_to_timestamp(timestamp, user_timezone)
+        else:
+            change_time = time.time()
+
+        # Access Firestore client directly for custom timestamp support
+        client = api._get_firestore_client()
+        diaper_ref = client.collection("diaper").document(child_uid)
+
+        # Create interval ID (timestamp in ms + random suffix)
+        interval_timestamp_ms = int(change_time * 1000)
+        interval_id = f"{interval_timestamp_ms}-{uuid.uuid4().hex[:20]}"
+
+        # Build interval data (matching app behavior)
+        interval_data = {
+            "start": change_time,
+            "lastUpdated": change_time,
+            "mode": mode,
+            "offset": api._get_timezone_offset_minutes(),
+        }
+
+        # Add quantity field if amounts are specified
+        amount_map = {"little": 0.0, "medium": 50.0, "big": 100.0}
+        quantity = {}
+        if pee_amount and pee_amount in amount_map:
+            quantity["pee"] = amount_map[pee_amount]
+        if poo_amount and poo_amount in amount_map:
+            quantity["poo"] = amount_map[poo_amount]
+        if quantity:
+            interval_data["quantity"] = quantity
+
+        # Add optional fields if provided
+        if color:
+            interval_data["color"] = color
+        if consistency:
+            interval_data["consistency"] = consistency
+        if diaper_rash:
+            interval_data["diaperRash"] = True
+        if notes:
+            interval_data["notes"] = notes
+
+        # Create interval document in subcollection
+        diaper_ref.collection("intervals").document(interval_id).set(interval_data)
+
+        # Update prefs.lastDiaper
+        last_diaper_data = {
+            "start": change_time,
+            "mode": mode,
+            "offset": api._get_timezone_offset_minutes(),
+        }
+        diaper_ref.update({
+            "prefs.lastDiaper": last_diaper_data,
+            "prefs.timestamp": {"seconds": change_time},
+            "prefs.local_timestamp": change_time,
+        })
 
         message_parts = [f"Logged diaper change ({mode})"]
         if color:
@@ -110,13 +186,16 @@ async def log_diaper(
         if consistency:
             message_parts.append(f"consistency: {consistency}")
 
+        # Convert timestamp for response
+        timestamp_dt = datetime.fromtimestamp(change_time, tz=timezone.utc)
+
         return {
             "success": True,
             "message": f"{', '.join(message_parts)} for child {child_uid}",
             "mode": mode,
             "color": color,
             "consistency": consistency,
-            "timestamp": datetime.now().isoformat()
+            "timestamp": timestamp_dt.isoformat()
         }
 
     except ValueError as e:

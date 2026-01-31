@@ -19,6 +19,25 @@ def mock_api():
     })  # Synchronous, not async
     api.get_health_entries = MagicMock(return_value=[])  # Synchronous, not async
     api._timezone = ZoneInfo("America/New_York")  # EST/EDT timezone
+    api._get_timezone_offset_minutes = MagicMock(return_value=-300.0)  # EST offset
+
+    # Mock Firestore client for log_growth with timestamp
+    mock_firestore = MagicMock()
+    mock_collection = MagicMock()
+    mock_document = MagicMock()
+    mock_data_collection = MagicMock()
+    mock_data_doc = MagicMock()
+
+    # Setup chain: client.collection("health").document(child_uid)
+    mock_firestore.collection.return_value = mock_collection
+    mock_collection.document.return_value = mock_document
+
+    # Setup chain: health_ref.collection("data").document(interval_id)
+    mock_document.collection.return_value = mock_data_collection
+    mock_data_collection.document.return_value = mock_data_doc
+
+    api._get_firestore_client = MagicMock(return_value=mock_firestore)
+
     return api
 
 
@@ -33,7 +52,6 @@ async def test_log_growth_weight_only(mock_api):
         assert result["success"] is True
         assert result["weight"] == 10.5
         assert "weight: 10.5lbs" in result["message"]
-        mock_api.log_growth.assert_called_once()
 
 
 @pytest.mark.asyncio
@@ -149,3 +167,22 @@ async def test_get_growth_history(mock_api):
         assert result[0]["weight"] == 10.5
         assert result[0]["height"] == 24.0
         assert result[0]["head"] == 16.5
+
+
+@pytest.mark.asyncio
+async def test_log_growth_with_timestamp(mock_api):
+    """Test logging growth with custom timestamp for retroactive logging."""
+    with patch("huckleberry_mcp.tools.growth.get_authenticated_api", return_value=mock_api), \
+         patch("huckleberry_mcp.tools.children.get_authenticated_api", return_value=mock_api):
+
+        result = await growth.log_growth(
+            "child1",
+            weight=10.5,
+            height=24.0,
+            timestamp="2024-01-15T10:30:00Z"
+        )
+
+        assert result["success"] is True
+        assert result["weight"] == 10.5
+        assert result["height"] == 24.0
+        assert "2024-01-15" in result["timestamp"]

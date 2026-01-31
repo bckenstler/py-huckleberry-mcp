@@ -216,7 +216,7 @@ async def list_tools() -> list[Tool]:
         # Diaper tracking
         Tool(
             name="log_diaper",
-            description="Log a diaper change with details",
+            description="Log a diaper change with details. Supports retroactive logging with optional timestamp.",
             inputSchema={
                 "type": "object",
                 "properties": {
@@ -227,7 +227,8 @@ async def list_tools() -> list[Tool]:
                     "color": {"type": "string", "description": "Poo color if present", "enum": ["yellow", "brown", "black", "green", "red", "gray"]},
                     "consistency": {"type": "string", "description": "Poo consistency if present", "enum": ["solid", "loose", "runny", "mucousy", "hard", "pebbles", "diarrhea"]},
                     "diaper_rash": {"type": "boolean", "description": "Whether baby has diaper rash", "default": False},
-                    "notes": {"type": "string", "description": "Optional notes about the diaper change"}
+                    "notes": {"type": "string", "description": "Optional notes about the diaper change"},
+                    "timestamp": {"type": "string", "description": "Optional timestamp in ISO format for retroactive logging (e.g., '2026-01-30T14:30:00'). If not provided, uses current time."}
                 },
                 "required": ["child_uid"]
             }
@@ -249,7 +250,7 @@ async def list_tools() -> list[Tool]:
         # Growth tracking
         Tool(
             name="log_growth",
-            description="Log growth measurements (weight, height, head circumference)",
+            description="Log growth measurements (weight, height, head circumference). Supports retroactive logging with optional timestamp.",
             inputSchema={
                 "type": "object",
                 "properties": {
@@ -257,7 +258,8 @@ async def list_tools() -> list[Tool]:
                     "weight": {"type": "number", "description": "Weight (lbs if imperial, kg if metric)"},
                     "height": {"type": "number", "description": "Height (inches if imperial, cm if metric)"},
                     "head": {"type": "number", "description": "Head circumference (inches if imperial, cm if metric)"},
-                    "units": {"type": "string", "description": "Measurement system", "enum": ["imperial", "metric"], "default": "imperial"}
+                    "units": {"type": "string", "description": "Measurement system", "enum": ["imperial", "metric"], "default": "imperial"},
+                    "timestamp": {"type": "string", "description": "Optional timestamp in ISO format for retroactive logging (e.g., '2026-01-30T14:30:00'). If not provided, uses current time."}
                 },
                 "required": ["child_uid"]
             }
@@ -364,7 +366,8 @@ async def call_tool(name: str, arguments: dict) -> list[TextContent]:
                 arguments.get("color"),
                 arguments.get("consistency"),
                 arguments.get("diaper_rash", False),
-                arguments.get("notes")
+                arguments.get("notes"),
+                arguments.get("timestamp")
             )
         elif name == "get_diaper_history":
             result = await diaper.get_diaper_history(
@@ -380,7 +383,8 @@ async def call_tool(name: str, arguments: dict) -> list[TextContent]:
                 arguments.get("weight"),
                 arguments.get("height"),
                 arguments.get("head"),
-                arguments.get("units", "imperial")
+                arguments.get("units", "imperial"),
+                arguments.get("timestamp")
             )
         elif name == "get_latest_growth":
             result = await growth.get_latest_growth(arguments["child_uid"])
