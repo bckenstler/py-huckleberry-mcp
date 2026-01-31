@@ -117,8 +117,24 @@ async def list_tools() -> list[Tool]:
 
         # Feeding tracking
         Tool(
+            name="log_breastfeeding",
+            description="Directly log a completed breastfeeding session without using the timer. Useful for retroactive logging. Provide either end_time OR duration(s).",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "child_uid": {"type": "string", "description": "The child's unique identifier"},
+                    "start_time": {"type": "string", "description": "Feeding start time in ISO format (e.g., '2026-01-30T14:30:00' or '2026-01-30T14:30:00Z')"},
+                    "left_duration_minutes": {"type": "integer", "description": "Duration on left breast in minutes (optional)"},
+                    "right_duration_minutes": {"type": "integer", "description": "Duration on right breast in minutes (optional)"},
+                    "end_time": {"type": "string", "description": "Feeding end time in ISO format (optional, alternative to durations)"},
+                    "last_side": {"type": "string", "description": "Which side finished on ('left' or 'right'). Required if using end_time.", "enum": ["left", "right"]}
+                },
+                "required": ["child_uid", "start_time"]
+            }
+        ),
+        Tool(
             name="start_breastfeeding",
-            description="Begin a breastfeeding tracking session",
+            description="Begin a breastfeeding tracking session using real-time timer",
             inputSchema={
                 "type": "object",
                 "properties": {
@@ -307,6 +323,15 @@ async def call_tool(name: str, arguments: dict) -> list[TextContent]:
             )
 
         # Feeding tracking
+        elif name == "log_breastfeeding":
+            result = await feeding.log_breastfeeding(
+                arguments["child_uid"],
+                arguments["start_time"],
+                arguments.get("left_duration_minutes"),
+                arguments.get("right_duration_minutes"),
+                arguments.get("end_time"),
+                arguments.get("last_side")
+            )
         elif name == "start_breastfeeding":
             result = await feeding.start_breastfeeding(
                 arguments["child_uid"],

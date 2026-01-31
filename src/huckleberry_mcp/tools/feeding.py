@@ -1,5 +1,7 @@
 """Feeding tracking tools for Huckleberry MCP server."""
 
+import time
+import uuid
 from typing import Any, Dict, List, Optional
 from datetime import datetime, timezone, timedelta
 from ..auth import get_authenticated_api
@@ -26,6 +28,175 @@ def iso_to_timestamp(iso_date: str, user_timezone=None) -> int:
         dt = dt.replace(tzinfo=timezone.utc)
 
     return int(dt.timestamp())
+
+
+def iso_datetime_to_timestamp(iso_datetime: str, user_timezone=None) -> int:
+    """Convert ISO datetime string to Unix timestamp (seconds).
+
+    Args:
+        iso_datetime: ISO datetime string (e.g., "2026-01-25T08:15:00" or "2026-01-25T08:15:00Z")
+        user_timezone: ZoneInfo object representing user's timezone. If provided and iso_datetime
+                       has no timezone, interprets the datetime as being in this timezone.
+
+    Returns:
+        Unix timestamp in seconds
+    """
+    dt = datetime.fromisoformat(iso_datetime.replace('Z', '+00:00'))
+
+    # If no timezone specified in the input string, use user's configured timezone
+    if dt.tzinfo is None:
+        if user_timezone is not None:
+            # Interpret as user's local time
+            dt = dt.replace(tzinfo=user_timezone)
+        else:
+            # Fallback to UTC if no user timezone provided
+            dt = dt.replace(tzinfo=timezone.utc)
+
+    return int(dt.timestamp())
+
+
+async def log_breastfeeding(
+    child_uid: str,
+    start_time: str,
+    left_duration_minutes: Optional[int] = None,
+    right_duration_minutes: Optional[int] = None,
+    end_time: Optional[str] = None,
+    last_side: Optional[str] = None
+) -> Dict[str, Any]:
+    """
+    Directly log a completed breastfeeding session without using the timer.
+    Useful for retroactive logging or importing past feeding data.
+
+    Args:
+        child_uid: The child's unique identifier
+        start_time: Feeding start time in ISO format (e.g., "2026-01-30T14:30:00" or "2026-01-30T14:30:00Z")
+        left_duration_minutes: Duration on left breast in minutes (optional)
+        right_duration_minutes: Duration on right breast in minutes (optional)
+        end_time: Feeding end time in ISO format (optional, alternative to specifying durations)
+        last_side: Which side finished on ("left" or "right"). Required if using end_time, optional otherwise.
+
+    Returns:
+        Status message confirming feeding logged with details
+
+    Raises:
+        ValueError: If invalid combination of parameters provided
+    """
+    try:
+        await validate_child_uid(child_uid)
+        api = await get_authenticated_api()
+
+        # Validate side if provided
+        if last_side and last_side not in ["left", "right"]:
+            raise ValueError("Invalid last_side. Must be 'left' or 'right'")
+
+        # Get user's timezone
+        user_timezone = api._timezone
+
+        # Convert start time to timestamp
+        start_timestamp = iso_datetime_to_timestamp(start_time, user_timezone)
+
+        # Determine durations
+        if end_time is not None:
+            # Calculate total duration from end_time
+            if left_duration_minutes is not None or right_duration_minutes is not None:
+                raise ValueError("When using end_time, do not specify left_duration_minutes or right_duration_minutes")
+
+            if last_side is None:
+                raise ValueError("When using end_time, last_side is required to determine which breast to assign duration to")
+
+            end_timestamp = iso_datetime_to_timestamp(end_time, user_timezone)
+            total_duration_sec = end_timestamp - start_timestamp
+
+            if total_duration_sec <= 0:
+                raise ValueError("end_time must be after start_time")
+
+            total_duration_min = total_duration_sec / 60
+
+            # Assign all duration to the specified side
+            if last_side == "left":
+                left_duration = total_duration_min
+                right_duration = 0.0
+            else:
+                left_duration = 0.0
+                right_duration = total_duration_min
+        else:
+            # Use provided durations
+            if left_duration_minutes is None and right_duration_minutes is None:
+                raise ValueError("Must provide either end_time OR at least one of left_duration_minutes/right_duration_minutes")
+
+            left_duration = float(left_duration_minutes) if left_duration_minutes is not None else 0.0
+            right_duration = float(right_duration_minutes) if right_duration_minutes is not None else 0.0
+
+            # Determine last_side if not provided
+            if last_side is None:
+                # Default to whichever side has more duration
+                last_side = "right" if right_duration >= left_duration else "left"
+
+        # Access Firestore client directly (following library's internal pattern)
+        client = api._get_firestore_client()
+        feed_ref = client.collection("feed").document(child_uid)
+
+        # Generate interval ID (format: timestamp-random, matching complete_feeding)
+        current_time = time.time()
+        interval_id = f"{int(current_time * 1000)}-{uuid.uuid4().hex[:20]}"
+
+        # Create interval document (matching complete_feeding structure)
+        interval_data = {
+            "mode": "breast",
+            "start": start_timestamp,
+            "lastSide": last_side,
+            "lastUpdated": current_time,
+            "leftDuration": left_duration,
+            "rightDuration": right_duration,
+            "offset": api._get_timezone_offset_minutes(),
+            "end_offset": api._get_timezone_offset_minutes(),
+        }
+
+        # Write to intervals subcollection
+        feed_ref.collection("intervals").document(interval_id).set(interval_data)
+
+        # Update prefs.lastNursing and prefs.lastSide (matching complete_feeding behavior)
+        total_duration = left_duration + right_duration
+
+        last_nursing_data = {
+            "mode": "breast",
+            "start": start_timestamp,
+            "duration": total_duration,
+            "leftDuration": left_duration,
+            "rightDuration": right_duration,
+            "offset": api._get_timezone_offset_minutes(),
+        }
+
+        last_side_data = {
+            "start": start_timestamp,
+            "lastSide": last_side,
+        }
+
+        feed_ref.update({
+            "prefs.lastNursing": last_nursing_data,
+            "prefs.lastSide": last_side_data,
+            "prefs.timestamp": {"seconds": current_time},
+            "prefs.local_timestamp": current_time,
+        })
+
+        # Convert timestamp for response
+        start_dt = datetime.fromtimestamp(start_timestamp, tz=timezone.utc)
+
+        return {
+            "success": True,
+            "message": f"Breastfeeding logged for child {child_uid}",
+            "start_time": start_dt.isoformat(),
+            "left_duration_minutes": int(left_duration),
+            "right_duration_minutes": int(right_duration),
+            "total_duration_minutes": int(total_duration),
+            "last_side": last_side,
+            "interval_id": interval_id
+        }
+
+    except ValueError as e:
+        raise
+    except Exception as e:
+        raise Exception(f"Failed to log breastfeeding: {str(e)}")
 
 
 async def start_breastfeeding(child_uid: str, side: str) -> Dict[str, Any]:

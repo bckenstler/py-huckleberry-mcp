@@ -150,8 +150,29 @@ Get sleep history for a child within a date range (defaults to last 7 days).
 
 ### Feeding Tracking
 
+#### `log_breastfeeding`
+Directly log a completed breastfeeding session without using the timer. Useful for retroactive logging or importing past feeding data.
+
+**Parameters**:
+- `child_uid` (string, required): The child's unique identifier
+- `start_time` (string, required): Feeding start time in ISO format. If no timezone specified, interpreted as your configured timezone.
+- `left_duration_minutes` (integer, optional): Duration on left breast in minutes
+- `right_duration_minutes` (integer, optional): Duration on right breast in minutes
+- `end_time` (string, optional): Feeding end time in ISO format (provide this OR durations)
+- `last_side` (string, optional): Which side finished on ("left" or "right"). Required if using end_time.
+
+**Usage patterns**:
+- With durations: Provide `left_duration_minutes` and/or `right_duration_minutes`
+- With end time: Provide `end_time` and `last_side` (calculates duration automatically)
+
+**Timezone Note**: Times without timezone info are interpreted using your `HUCKLEBERRY_TIMEZONE` setting.
+
+**Examples**:
+- "Log a breastfeeding session from 2pm to 2:30pm yesterday on the left"
+- "Log breastfeeding: 10 minutes left, 15 minutes right, starting at 3pm today"
+
 #### `start_breastfeeding`
-Begin a breastfeeding tracking session.
+Begin a breastfeeding tracking session using real-time timer.
 
 **Parameters**:
 - `child_uid` (string, required): The child's unique identifier
@@ -292,7 +313,9 @@ Once configured in Claude Desktop, you can interact with the server through natu
    - "Show me sleep history for the last week"
 
 3. **Track feeding**:
-   - "Start breastfeeding on the left side"
+   - "Log a breastfeeding session from 2pm to 2:30pm on the left" (direct logging)
+   - "Log breastfeeding: 10 minutes left, 15 minutes right, starting at 3pm" (direct logging)
+   - "Start breastfeeding on the left side" (real-time timer)
    - "Switch to the right breast"
    - "Complete the feeding session"
    - "Show me today's feedings"
