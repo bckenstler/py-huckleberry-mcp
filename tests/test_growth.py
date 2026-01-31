@@ -10,9 +10,13 @@ def mock_api():
     """Create a mock API instance."""
     api = AsyncMock()
     api.get_children = MagicMock(return_value=[{"uid": "child1", "name": "Alice"}])
-    api.log_growth_measurement = AsyncMock()
-    api.get_latest_growth_measurement = AsyncMock(return_value=None)
-    api.get_growth_history = AsyncMock(return_value=[])
+    api.log_growth = MagicMock()  # Synchronous, not async
+    api.get_growth_data = MagicMock(return_value={
+        "weight_units": "kg",
+        "height_units": "cm",
+        "head_units": "hcm"
+    })  # Synchronous, not async
+    api.get_health_entries = MagicMock(return_value=[])  # Synchronous, not async
     return api
 
 
@@ -27,7 +31,7 @@ async def test_log_growth_weight_only(mock_api):
         assert result["success"] is True
         assert result["weight"] == 10.5
         assert "weight: 10.5lbs" in result["message"]
-        mock_api.log_growth_measurement.assert_called_once()
+        mock_api.log_growth.assert_called_once()
 
 
 @pytest.mark.asyncio
@@ -40,14 +44,14 @@ async def test_log_growth_all_measurements(mock_api):
             "child1",
             weight=10.5,
             height=24.0,
-            head_circumference=16.5,
+            head=16.5,
             units="imperial"
         )
 
         assert result["success"] is True
         assert result["weight"] == 10.5
         assert result["height"] == 24.0
-        assert result["head_circumference"] == 16.5
+        assert result["head"] == 16.5
 
 
 @pytest.mark.asyncio
@@ -85,13 +89,14 @@ async def test_log_growth_invalid_units(mock_api):
 @pytest.mark.asyncio
 async def test_get_latest_growth(mock_api):
     """Test getting latest growth measurements."""
-    mock_api.get_latest_growth_measurement = AsyncMock(return_value={
-        "timestamp": "2024-01-01T10:00:00",
+    mock_api.get_growth_data = MagicMock(return_value={
         "weight": 10.5,
         "height": 24.0,
-        "headCircumference": 16.5,
-        "units": "imperial",
-        "ageDays": 90
+        "head": 16.5,
+        "weight_units": "lbs",
+        "height_units": "in",
+        "head_units": "in",
+        "timestamp_sec": 1704103200
     })
 
     with patch("huckleberry_mcp.tools.growth.get_authenticated_api", return_value=mock_api), \
@@ -101,12 +106,18 @@ async def test_get_latest_growth(mock_api):
 
         assert result["weight"] == 10.5
         assert result["height"] == 24.0
-        assert result["head_circumference"] == 16.5
+        assert result["head"] == 16.5
 
 
 @pytest.mark.asyncio
 async def test_get_latest_growth_no_data(mock_api):
     """Test getting latest growth when no measurements exist."""
+    mock_api.get_growth_data = MagicMock(return_value={
+        "weight_units": "kg",
+        "height_units": "cm",
+        "head_units": "hcm"
+    })
+
     with patch("huckleberry_mcp.tools.growth.get_authenticated_api", return_value=mock_api), \
          patch("huckleberry_mcp.tools.children.get_authenticated_api", return_value=mock_api):
 
@@ -118,14 +129,12 @@ async def test_get_latest_growth_no_data(mock_api):
 @pytest.mark.asyncio
 async def test_get_growth_history(mock_api):
     """Test getting growth history."""
-    mock_api.get_growth_history = AsyncMock(return_value=[
+    mock_api.get_health_entries = MagicMock(return_value=[
         {
-            "timestamp": "2024-01-01T10:00:00",
+            "start": 1704103200,  # Unix timestamp
             "weight": 10.5,
             "height": 24.0,
-            "headCircumference": 16.5,
-            "units": "imperial",
-            "ageDays": 90
+            "head": 16.5
         }
     ])
 
@@ -136,3 +145,5 @@ async def test_get_growth_history(mock_api):
 
         assert len(result) == 1
         assert result[0]["weight"] == 10.5
+        assert result[0]["height"] == 24.0
+        assert result[0]["head"] == 16.5
