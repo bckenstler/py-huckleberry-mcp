@@ -407,22 +407,17 @@ async def call_tool(name: str, arguments: dict) -> list[TextContent]:
 async def main():
     """Main entry point for the MCP server."""
     try:
-        # Pre-authenticate on startup
         print("Initializing Huckleberry MCP server...", file=sys.stderr)
-        await get_authenticated_api()
-        print("Authentication successful!", file=sys.stderr)
 
-        # Run the server
+        # Run the server - authentication will happen lazily when tools are called
         async with stdio_server() as (read_stream, write_stream):
+            print("Server ready and waiting for requests", file=sys.stderr)
             await app.run(
                 read_stream,
                 write_stream,
                 app.create_initialization_options()
             )
 
-    except HuckleberryAuthError as e:
-        print(f"Authentication error: {e}", file=sys.stderr)
-        sys.exit(1)
     except Exception as e:
         print(f"Server error: {e}", file=sys.stderr)
         sys.exit(1)
