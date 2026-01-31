@@ -2,6 +2,7 @@
 
 import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
+from zoneinfo import ZoneInfo
 from huckleberry_mcp.tools import diaper
 
 
@@ -12,6 +13,7 @@ def mock_api():
     api.get_children = MagicMock(return_value=[{"uid": "child1", "name": "Alice"}])
     api.log_diaper = MagicMock()  # Synchronous, not async
     api.get_diaper_intervals = MagicMock(return_value=[])  # Synchronous, not async
+    api._timezone = ZoneInfo("America/New_York")  # EST/EDT timezone
     return api
 
 

@@ -6,9 +6,25 @@ from ..auth import get_authenticated_api
 from .children import validate_child_uid
 
 
-def iso_to_timestamp(iso_date: str) -> int:
-    """Convert ISO date string (YYYY-MM-DD) to Unix timestamp."""
-    dt = datetime.fromisoformat(iso_date).replace(tzinfo=timezone.utc)
+def iso_to_timestamp(iso_date: str, user_timezone=None) -> int:
+    """Convert ISO date string (YYYY-MM-DD) to Unix timestamp.
+
+    Args:
+        iso_date: Date string in YYYY-MM-DD format
+        user_timezone: ZoneInfo object. If provided, interprets date as midnight in this timezone.
+                      Otherwise defaults to UTC.
+
+    Returns:
+        Unix timestamp in seconds
+    """
+    dt = datetime.fromisoformat(iso_date)
+
+    # Apply timezone (user's local or UTC)
+    if user_timezone is not None:
+        dt = dt.replace(tzinfo=user_timezone)
+    else:
+        dt = dt.replace(tzinfo=timezone.utc)
+
     return int(dt.timestamp())
 
 
@@ -137,16 +153,19 @@ async def get_growth_history(
         await validate_child_uid(child_uid)
         api = await get_authenticated_api()
 
+        # Get user's timezone for proper date interpretation
+        user_timezone = api._timezone
+
         # Default to last 30 days if no dates provided
         if not start_date:
             start_timestamp = int((datetime.now(timezone.utc) - timedelta(days=30)).timestamp())
         else:
-            start_timestamp = iso_to_timestamp(start_date)
+            start_timestamp = iso_to_timestamp(start_date, user_timezone)
 
         if not end_date:
             end_timestamp = int(datetime.now(timezone.utc).timestamp())
         else:
-            end_timestamp = iso_to_timestamp(end_date)
+            end_timestamp = iso_to_timestamp(end_date, user_timezone)
 
         # Use get_health_entries which returns growth/health measurements
         entries = api.get_health_entries(child_uid, start_timestamp, end_timestamp)

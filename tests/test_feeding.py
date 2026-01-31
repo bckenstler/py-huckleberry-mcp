@@ -2,6 +2,7 @@
 
 import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
+from zoneinfo import ZoneInfo
 from huckleberry_mcp.tools import feeding
 
 
@@ -17,6 +18,7 @@ def mock_api():
     api.complete_feeding = MagicMock()  # Synchronous, not async
     api.cancel_feeding = MagicMock()  # Synchronous, not async
     api.get_feed_intervals = MagicMock(return_value=[])  # Synchronous, not async
+    api._timezone = ZoneInfo("America/New_York")  # EST/EDT timezone
     return api
 
 

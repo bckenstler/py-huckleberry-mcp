@@ -2,6 +2,7 @@
 
 import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
+from zoneinfo import ZoneInfo
 from huckleberry_mcp.tools import growth
 
 
@@ -17,6 +18,7 @@ def mock_api():
         "head_units": "hcm"
     })  # Synchronous, not async
     api.get_health_entries = MagicMock(return_value=[])  # Synchronous, not async
+    api._timezone = ZoneInfo("America/New_York")  # EST/EDT timezone
     return api
 
 
