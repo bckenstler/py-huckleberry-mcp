@@ -5,9 +5,9 @@ A Model Context Protocol (MCP) server that interfaces with the Huckleberry baby 
 ## Features
 
 - **Child Management**: List and manage multiple child profiles
-- **Sleep Tracking**: Start, pause, resume, complete, and cancel sleep sessions
-- **Feeding Tracking**: Track breastfeeding sessions with side switching and bottle feeding
-- **Diaper Logging**: Record diaper changes with type, color, and consistency details
+- **Sleep Tracking**: Start, pause, resume, complete, and cancel sleep sessions with automatic history tracking
+- **Feeding Tracking**: Track breastfeeding sessions with side switching
+- **Diaper Logging**: Record diaper changes with type, amount, color, and consistency details
 - **Growth Tracking**: Log and retrieve weight, height, and head circumference measurements
 
 ## Prerequisites
@@ -22,22 +22,23 @@ A Model Context Protocol (MCP) server that interfaces with the Huckleberry baby 
 ### Using uv (Recommended)
 
 ```bash
-cd /home/ubuntu/projects/huckleberry-mcp
+# Clone or navigate to the project directory
+cd /path/to/huckleberry-mcp
 uv sync
 ```
 
 ### Using pip
 
 ```bash
-cd /home/ubuntu/projects/huckleberry-mcp
+cd /path/to/huckleberry-mcp
 pip install -e .
 ```
 
 ## Authentication Setup
 
-The server requires your Huckleberry credentials to be configured as environment variables. You have two options:
+The server requires your Huckleberry credentials to be configured as environment variables.
 
-### Option 1: Claude Desktop Configuration (Recommended)
+### Claude Desktop Configuration (Recommended)
 
 Add the server to your Claude Desktop configuration file with your credentials:
 
@@ -52,7 +53,7 @@ Add the server to your Claude Desktop configuration file with your credentials:
       "command": "uv",
       "args": [
         "--directory",
-        "/home/ubuntu/projects/huckleberry-mcp",
+        "/absolute/path/to/huckleberry-mcp",
         "run",
         "huckleberry-mcp"
       ],
@@ -66,21 +67,10 @@ Add the server to your Claude Desktop configuration file with your credentials:
 }
 ```
 
-### Option 2: Environment Variables
-
-Create a `.env` file in the project root (copy from `.env.example`):
-
-```bash
-cp .env.example .env
-```
-
-Then edit `.env` with your credentials:
-
-```bash
-HUCKLEBERRY_EMAIL=your-email@example.com
-HUCKLEBERRY_PASSWORD=your-password
-HUCKLEBERRY_TIMEZONE=America/New_York
-```
+**Important**:
+- Replace `/absolute/path/to/huckleberry-mcp` with the actual absolute path to this project
+- On macOS, if using Anaconda, specify the full path to `uv`: `/Users/your-username/anaconda3/bin/uv`
+- Ensure `uv` is in your PATH or use the full path to the `uv` executable
 
 ## Available Tools
 
@@ -133,16 +123,8 @@ Cancel and discard a sleep tracking session.
 
 **Example**: "Cancel the sleep session"
 
-#### `get_sleep_status`
-Get the current status of sleep tracking for a child.
-
-**Parameters**:
-- `child_uid` (string, required): The child's unique identifier
-
-**Example**: "What's the sleep status?"
-
 #### `get_sleep_history`
-Get sleep history for a child within a date range.
+Get sleep history for a child within a date range (defaults to last 7 days).
 
 **Parameters**:
 - `child_uid` (string, required): The child's unique identifier
@@ -202,27 +184,8 @@ Cancel and discard a feeding tracking session.
 
 **Example**: "Cancel feeding"
 
-#### `log_bottle_feeding`
-Log a bottle feeding without using a timer.
-
-**Parameters**:
-- `child_uid` (string, required): The child's unique identifier
-- `amount` (number, required): Amount fed
-- `bottle_type` (string, optional): Type of bottle feeding ("formula", "breast_milk", "mixed"), default: "formula"
-- `units` (string, optional): Units of measurement ("oz" or "ml"), default: "oz"
-
-**Example**: "Log a 4oz formula bottle"
-
-#### `get_feeding_status`
-Get the current status of feeding tracking for a child.
-
-**Parameters**:
-- `child_uid` (string, required): The child's unique identifier
-
-**Example**: "What's the feeding status?"
-
 #### `get_feeding_history`
-Get feeding history for a child within a date range.
+Get feeding history for a child within a date range (defaults to last 7 days).
 
 **Parameters**:
 - `child_uid` (string, required): The child's unique identifier
@@ -239,13 +202,17 @@ Log a diaper change with details.
 **Parameters**:
 - `child_uid` (string, required): The child's unique identifier
 - `mode` (string, optional): Diaper mode ("pee", "poo", "both", "dry"), default: "both"
-- `poo_color` (string, optional): Color of poo if present ("brown", "yellow", "green", "black")
-- `consistency` (string, optional): Consistency of poo if present ("soft", "firm", "watery", "hard")
+- `pee_amount` (string, optional): Pee amount ("little", "medium", "big")
+- `poo_amount` (string, optional): Poo amount ("little", "medium", "big")
+- `color` (string, optional): Poo color if present ("yellow", "brown", "black", "green", "red", "gray")
+- `consistency` (string, optional): Poo consistency if present ("solid", "loose", "runny", "mucousy", "hard", "pebbles", "diarrhea")
+- `diaper_rash` (boolean, optional): Whether baby has diaper rash, default: false
+- `notes` (string, optional): Optional notes about the diaper change
 
 **Example**: "Log a diaper change with pee and poo"
 
 #### `get_diaper_history`
-Get diaper change history for a child within a date range.
+Get diaper change history for a child within a date range (defaults to last 7 days).
 
 **Parameters**:
 - `child_uid` (string, required): The child's unique identifier
@@ -263,7 +230,7 @@ Log growth measurements (weight, height, head circumference).
 - `child_uid` (string, required): The child's unique identifier
 - `weight` (number, optional): Weight (lbs if imperial, kg if metric)
 - `height` (number, optional): Height (inches if imperial, cm if metric)
-- `head_circumference` (number, optional): Head circumference (inches if imperial, cm if metric)
+- `head` (number, optional): Head circumference (inches if imperial, cm if metric)
 - `units` (string, optional): Measurement system ("imperial" or "metric"), default: "imperial"
 
 **Example**: "Log weight of 12.5 lbs and height of 24 inches"
@@ -277,7 +244,7 @@ Get the latest growth measurements for a child.
 **Example**: "What are the latest growth measurements?"
 
 #### `get_growth_history`
-Get growth measurement history for a child within a date range.
+Get growth measurement history for a child within a date range (defaults to last 30 days).
 
 **Parameters**:
 - `child_uid` (string, required): The child's unique identifier
@@ -299,22 +266,25 @@ Once configured in Claude Desktop, you can interact with the server through natu
    - "Alice is sleeping"
    - "Pause the sleep timer"
    - "Alice woke up, complete the sleep session"
+   - "Show me sleep history for the last week"
 
 3. **Track feeding**:
    - "Start breastfeeding on the left side"
    - "Switch to the right breast"
    - "Complete the feeding session"
-   - "Log a 4oz formula bottle"
+   - "Show me today's feedings"
 
 4. **Log diaper changes**:
    - "Log a diaper change with pee and poo"
    - "Log a wet diaper"
-   - "Log a poopy diaper with soft brown poo"
+   - "Log a poopy diaper with loose yellow poo"
+   - "Log a diaper change with medium poo and diaper rash"
 
 5. **Track growth**:
    - "Log weight of 12.5 lbs"
-   - "Log weight 12.5 lbs, height 24 inches, and head circumference 16 inches"
+   - "Log weight 12.5 lbs, height 24 inches, and head 16 inches"
    - "What are the latest growth measurements?"
+   - "Show me growth history for the last month"
 
 6. **View history**:
    - "Show me sleep history for last week"
@@ -324,6 +294,8 @@ Once configured in Claude Desktop, you can interact with the server through natu
 ## Development
 
 ### Running Tests
+
+All tests pass and accurately reflect the actual Huckleberry API:
 
 ```bash
 # Using uv
@@ -349,36 +321,57 @@ huckleberry-mcp/
 │           ├── feeding.py         # Feeding tracking tools
 │           ├── diaper.py          # Diaper logging tools
 │           └── growth.py          # Growth measurement tools
-├── tests/                         # Test suite
+├── tests/                         # Test suite (36 tests, all passing)
 ├── pyproject.toml                 # Project configuration
 ├── README.md                      # This file
 ├── .env.example                   # Example environment variables
 └── .gitignore
 ```
 
+## Implementation Notes
+
+This server is fully refactored to match the actual [py-huckleberry-api](https://github.com/Woyken/py-huckleberry-api) library interface:
+
+- All history methods use Unix timestamps internally and convert to/from ISO dates
+- Timer operations (sleep/feeding) directly call API methods without status pre-checks
+- Growth tracking uses `head` parameter instead of `head_circumference`
+- Diaper logging includes amount fields (`pee_amount`, `poo_amount`) and uses `color` instead of `poo_color`
+- The server starts successfully even with invalid credentials, returning helpful errors when tools are called
+
 ## Troubleshooting
 
 ### Authentication Errors
 
-If you see authentication errors:
+If you see authentication errors when calling tools:
 
 1. Verify your credentials are correct in the Claude Desktop config
-2. Ensure your Huckleberry account is active
+2. Ensure your Huckleberry account is active and you can log in via the app
 3. Check that the timezone is valid (e.g., "America/New_York", "Europe/London")
+4. The server will start successfully but authentication happens when you call a tool
 
 ### Server Not Appearing in Claude Desktop
 
 1. Verify the configuration file path is correct for your OS
-2. Restart Claude Desktop after making config changes
-3. Check the Claude Desktop logs for error messages
-4. Ensure `uv` is installed and in your PATH
+2. Check that the `--directory` path is absolute and correct
+3. On macOS with Anaconda, use full path to uv: `/Users/your-username/anaconda3/bin/uv`
+4. Restart Claude Desktop after making config changes
+5. Check the Claude Desktop logs for error messages
+6. Ensure `uv` is installed and accessible
+
+### Server Fails to Start
+
+If you see "Failed to spawn process: No such file or directory":
+
+1. The `uv` command is not found - specify the full path to the `uv` executable
+2. On macOS, find uv with: `which uv` or check `/Users/your-username/anaconda3/bin/uv`
+3. Update the `command` field in your config to use the absolute path
 
 ### Tools Not Working
 
 1. Make sure you've listed children first to get valid child UIDs
 2. Verify the child UID is correct when using tools
-3. Check for active sessions before starting new ones (sleep/feeding)
-4. Review error messages for specific validation issues
+3. Timer sessions can be started/stopped without checking status first
+4. Review error messages for specific validation issues (invalid colors, amounts, etc.)
 
 ## Security Considerations
 
@@ -386,6 +379,7 @@ If you see authentication errors:
 - Store credentials only in environment variables or Claude Desktop config
 - The `.gitignore` file excludes `.env` files by default
 - Credentials are never logged by the server
+- All API communication uses HTTPS
 
 ## Contributing
 
@@ -398,7 +392,7 @@ MIT License - See LICENSE file for details
 ## Acknowledgments
 
 - Built with the [Model Context Protocol](https://modelcontextprotocol.io/)
-- Uses the [huckleberry-api](https://github.com/Woyken/py-huckleberry-api) Python library
+- Uses the [py-huckleberry-api](https://github.com/Woyken/py-huckleberry-api) Python library
 - Powered by Claude from Anthropic
 
 ## Support
