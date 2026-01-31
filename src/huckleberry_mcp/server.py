@@ -1,6 +1,7 @@
 """Main MCP server entry point for Huckleberry baby tracking."""
 
 import sys
+import json
 import asyncio
 from typing import Optional
 from mcp.server import Server
@@ -389,7 +390,6 @@ async def call_tool(name: str, arguments: dict) -> list[TextContent]:
             raise ValueError(f"Unknown tool: {name}")
 
         # Format result as TextContent
-        import json
         return [TextContent(
             type="text",
             text=json.dumps(result, indent=2)

@@ -13,7 +13,7 @@ async def list_children() -> List[Dict[str, Any]]:
     """
     try:
         api = await get_authenticated_api()
-        children = await api.get_children()
+        children = api.get_children()
 
         result = []
         for child in children:
@@ -41,7 +41,7 @@ async def validate_child_uid(child_uid: str) -> bool:
     """
     try:
         api = await get_authenticated_api()
-        children = await api.get_children()
+        children = api.get_children()
 
         valid_uids = [child.get("uid") for child in children]
 
@@ -71,7 +71,7 @@ async def get_child_name(child_uid: str) -> Optional[str]:
     """
     try:
         api = await get_authenticated_api()
-        children = await api.get_children()
+        children = api.get_children()
 
         for child in children:
             if child.get("uid") == child_uid:
