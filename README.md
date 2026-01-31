@@ -128,8 +128,10 @@ Get sleep history for a child within a date range (defaults to last 7 days).
 
 **Parameters**:
 - `child_uid` (string, required): The child's unique identifier
-- `start_date` (string, optional): Start date in ISO format (YYYY-MM-DD)
-- `end_date` (string, optional): End date in ISO format (YYYY-MM-DD)
+- `start_date` (string, optional): Start date in ISO format (YYYY-MM-DD), inclusive
+- `end_date` (string, optional): End date in ISO format (YYYY-MM-DD), exclusive (data up to but not including this date)
+
+**Important**: The `end_date` is exclusive. To get data for a single day (e.g., Jan 30), set `start_date='2026-01-30'` and `end_date='2026-01-31'`.
 
 **Example**: "Show me sleep history for the last week"
 
@@ -189,8 +191,10 @@ Get feeding history for a child within a date range (defaults to last 7 days).
 
 **Parameters**:
 - `child_uid` (string, required): The child's unique identifier
-- `start_date` (string, optional): Start date in ISO format (YYYY-MM-DD)
-- `end_date` (string, optional): End date in ISO format (YYYY-MM-DD)
+- `start_date` (string, optional): Start date in ISO format (YYYY-MM-DD), inclusive
+- `end_date` (string, optional): End date in ISO format (YYYY-MM-DD), exclusive (data up to but not including this date)
+
+**Important**: The `end_date` is exclusive. To get data for a single day (e.g., Jan 30), set `start_date='2026-01-30'` and `end_date='2026-01-31'`.
 
 **Example**: "Show me today's feedings"
 
@@ -216,8 +220,10 @@ Get diaper change history for a child within a date range (defaults to last 7 da
 
 **Parameters**:
 - `child_uid` (string, required): The child's unique identifier
-- `start_date` (string, optional): Start date in ISO format (YYYY-MM-DD)
-- `end_date` (string, optional): End date in ISO format (YYYY-MM-DD)
+- `start_date` (string, optional): Start date in ISO format (YYYY-MM-DD), inclusive
+- `end_date` (string, optional): End date in ISO format (YYYY-MM-DD), exclusive (data up to but not including this date)
+
+**Important**: The `end_date` is exclusive. To get data for a single day (e.g., Jan 30), set `start_date='2026-01-30'` and `end_date='2026-01-31'`.
 
 **Example**: "Show me today's diaper changes"
 
@@ -248,8 +254,10 @@ Get growth measurement history for a child within a date range (defaults to last
 
 **Parameters**:
 - `child_uid` (string, required): The child's unique identifier
-- `start_date` (string, optional): Start date in ISO format (YYYY-MM-DD)
-- `end_date` (string, optional): End date in ISO format (YYYY-MM-DD)
+- `start_date` (string, optional): Start date in ISO format (YYYY-MM-DD), inclusive
+- `end_date` (string, optional): End date in ISO format (YYYY-MM-DD), exclusive (data up to but not including this date)
+
+**Important**: The `end_date` is exclusive. To get data for a single day (e.g., Jan 30), set `start_date='2026-01-30'` and `end_date='2026-01-31'`.
 
 **Example**: "Show me growth history for the last month"
 

@@ -89,13 +89,13 @@ async def list_tools() -> list[Tool]:
         ),
         Tool(
             name="get_sleep_history",
-            description="Get sleep history for a child within a date range",
+            description="Get sleep history for a child within a date range. Note: end_date is exclusive (data up to but not including that date). To get data for a single day (e.g., Jan 30), set start_date='2026-01-30' and end_date='2026-01-31'.",
             inputSchema={
                 "type": "object",
                 "properties": {
                     "child_uid": {"type": "string", "description": "The child's unique identifier"},
-                    "start_date": {"type": "string", "description": "Start date in ISO format (YYYY-MM-DD)"},
-                    "end_date": {"type": "string", "description": "End date in ISO format (YYYY-MM-DD)"}
+                    "start_date": {"type": "string", "description": "Start date in ISO format (YYYY-MM-DD), inclusive"},
+                    "end_date": {"type": "string", "description": "End date in ISO format (YYYY-MM-DD), exclusive (data up to but not including this date)"}
                 },
                 "required": ["child_uid"]
             }
@@ -171,13 +171,13 @@ async def list_tools() -> list[Tool]:
         ),
         Tool(
             name="get_feeding_history",
-            description="Get feeding history for a child within a date range",
+            description="Get feeding history for a child within a date range. Note: end_date is exclusive (data up to but not including that date). To get data for a single day (e.g., Jan 30), set start_date='2026-01-30' and end_date='2026-01-31'.",
             inputSchema={
                 "type": "object",
                 "properties": {
                     "child_uid": {"type": "string", "description": "The child's unique identifier"},
-                    "start_date": {"type": "string", "description": "Start date in ISO format (YYYY-MM-DD)"},
-                    "end_date": {"type": "string", "description": "End date in ISO format (YYYY-MM-DD)"}
+                    "start_date": {"type": "string", "description": "Start date in ISO format (YYYY-MM-DD), inclusive"},
+                    "end_date": {"type": "string", "description": "End date in ISO format (YYYY-MM-DD), exclusive (data up to but not including this date)"}
                 },
                 "required": ["child_uid"]
             }
@@ -204,13 +204,13 @@ async def list_tools() -> list[Tool]:
         ),
         Tool(
             name="get_diaper_history",
-            description="Get diaper change history for a child within a date range",
+            description="Get diaper change history for a child within a date range. Note: end_date is exclusive (data up to but not including that date). To get data for a single day (e.g., Jan 30), set start_date='2026-01-30' and end_date='2026-01-31'.",
             inputSchema={
                 "type": "object",
                 "properties": {
                     "child_uid": {"type": "string", "description": "The child's unique identifier"},
-                    "start_date": {"type": "string", "description": "Start date in ISO format (YYYY-MM-DD)"},
-                    "end_date": {"type": "string", "description": "End date in ISO format (YYYY-MM-DD)"}
+                    "start_date": {"type": "string", "description": "Start date in ISO format (YYYY-MM-DD), inclusive"},
+                    "end_date": {"type": "string", "description": "End date in ISO format (YYYY-MM-DD), exclusive (data up to but not including this date)"}
                 },
                 "required": ["child_uid"]
             }
@@ -245,13 +245,13 @@ async def list_tools() -> list[Tool]:
         ),
         Tool(
             name="get_growth_history",
-            description="Get growth measurement history for a child within a date range",
+            description="Get growth measurement history for a child within a date range. Note: end_date is exclusive (data up to but not including that date). To get data for a single day (e.g., Jan 30), set start_date='2026-01-30' and end_date='2026-01-31'.",
             inputSchema={
                 "type": "object",
                 "properties": {
                     "child_uid": {"type": "string", "description": "The child's unique identifier"},
-                    "start_date": {"type": "string", "description": "Start date in ISO format (YYYY-MM-DD)"},
-                    "end_date": {"type": "string", "description": "End date in ISO format (YYYY-MM-DD)"}
+                    "start_date": {"type": "string", "description": "Start date in ISO format (YYYY-MM-DD), inclusive"},
+                    "end_date": {"type": "string", "description": "End date in ISO format (YYYY-MM-DD), exclusive (data up to but not including this date)"}
                 },
                 "required": ["child_uid"]
             }
