@@ -1,7 +1,7 @@
 """Tests for child management tools."""
 
 import pytest
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 from huckleberry_mcp.tools.children import list_children, validate_child_uid, get_child_name
 
 
@@ -9,7 +9,8 @@ from huckleberry_mcp.tools.children import list_children, validate_child_uid, ge
 def mock_api():
     """Create a mock API instance."""
     api = AsyncMock()
-    api.get_children = AsyncMock(return_value=[
+    # get_children is synchronous, not async! Use MagicMock for synchronous methods
+    api.get_children = MagicMock(return_value=[
         {"uid": "child1", "name": "Alice", "birthDate": "2023-01-15"},
         {"uid": "child2", "name": "Bob", "birthDate": "2024-03-20"},
     ])

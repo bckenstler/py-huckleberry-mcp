@@ -60,7 +60,8 @@ async def test_authenticate_success(auth, mock_env):
     """Test successful authentication."""
     with patch("huckleberry_mcp.auth.HuckleberryAPI") as mock_api_class:
         mock_api = AsyncMock()
-        mock_api.get_children = AsyncMock(return_value=[])
+        # get_children is synchronous, not async! Use MagicMock for synchronous methods
+        mock_api.get_children = MagicMock(return_value=[])
         mock_api_class.return_value = mock_api
 
         await auth.authenticate()
@@ -79,7 +80,8 @@ async def test_authenticate_failure(auth, mock_env):
     """Test authentication failure."""
     with patch("huckleberry_mcp.auth.HuckleberryAPI") as mock_api_class:
         mock_api = AsyncMock()
-        mock_api.get_children = AsyncMock(side_effect=Exception("Auth failed"))
+        # get_children is synchronous, not async! Use MagicMock for synchronous methods
+        mock_api.get_children = MagicMock(side_effect=Exception("Auth failed"))
         mock_api_class.return_value = mock_api
 
         with pytest.raises(HuckleberryAuthError, match="Failed to authenticate"):
@@ -97,7 +99,8 @@ async def test_get_api_authenticated(auth, mock_env):
     """Test getting API after authentication."""
     with patch("huckleberry_mcp.auth.HuckleberryAPI") as mock_api_class:
         mock_api = AsyncMock()
-        mock_api.get_children = AsyncMock(return_value=[])
+        # get_children is synchronous, not async! Use MagicMock for synchronous methods
+        mock_api.get_children = MagicMock(return_value=[])
         mock_api_class.return_value = mock_api
 
         await auth.authenticate()

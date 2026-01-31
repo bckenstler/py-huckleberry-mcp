@@ -1,7 +1,7 @@
 """Tests for feeding tracking tools."""
 
 import pytest
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 from huckleberry_mcp.tools import feeding
 
 
@@ -9,7 +9,7 @@ from huckleberry_mcp.tools import feeding
 def mock_api():
     """Create a mock API instance."""
     api = AsyncMock()
-    api.get_children = AsyncMock(return_value=[{"uid": "child1", "name": "Alice"}])
+    api.get_children = MagicMock(return_value=[{"uid": "child1", "name": "Alice"}])
     api.start_breastfeeding_timer = AsyncMock()
     api.pause_feeding_timer = AsyncMock()
     api.resume_feeding_timer = AsyncMock()

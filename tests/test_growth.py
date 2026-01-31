@@ -1,7 +1,7 @@
 """Tests for growth tracking tools."""
 
 import pytest
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 from huckleberry_mcp.tools import growth
 
 
@@ -9,7 +9,7 @@ from huckleberry_mcp.tools import growth
 def mock_api():
     """Create a mock API instance."""
     api = AsyncMock()
-    api.get_children = AsyncMock(return_value=[{"uid": "child1", "name": "Alice"}])
+    api.get_children = MagicMock(return_value=[{"uid": "child1", "name": "Alice"}])
     api.log_growth_measurement = AsyncMock()
     api.get_latest_growth_measurement = AsyncMock(return_value=None)
     api.get_growth_history = AsyncMock(return_value=[])

@@ -1,7 +1,7 @@
 """Tests for diaper tracking tools."""
 
 import pytest
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 from huckleberry_mcp.tools import diaper
 
 
@@ -9,7 +9,7 @@ from huckleberry_mcp.tools import diaper
 def mock_api():
     """Create a mock API instance."""
     api = AsyncMock()
-    api.get_children = AsyncMock(return_value=[{"uid": "child1", "name": "Alice"}])
+    api.get_children = MagicMock(return_value=[{"uid": "child1", "name": "Alice"}])
     api.log_diaper_change = AsyncMock()
     api.get_diaper_history = AsyncMock(return_value=[])
     return api
