@@ -8,8 +8,8 @@ from mcp.server import Server
 from mcp.server.stdio import stdio_server
 from mcp.types import Tool, TextContent
 
-from .auth import get_authenticated_api, HuckleberryAuthError
-from .tools import children, sleep, feeding, diaper, growth
+from huckleberry_mcp.auth import get_authenticated_api, HuckleberryAuthError
+from huckleberry_mcp.tools import children, sleep, feeding, diaper, growth
 
 
 # Create MCP server instance
