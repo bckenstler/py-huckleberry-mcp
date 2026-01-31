@@ -18,7 +18,7 @@ dev = [
 ]
 
 [project.scripts]
-huckleberry-mcp = "huckleberry_mcp.server:main"
+huckleberry-mcp = "huckleberry_mcp.server:run"
 
 [build-system]
 requires = ["hatchling"]
