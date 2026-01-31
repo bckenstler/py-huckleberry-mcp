@@ -46,7 +46,7 @@ class HuckleberryAuth:
 
             # Test authentication by attempting to get children
             # This will raise an exception if auth fails
-            await self.api.get_children()
+            self.api.get_children()
 
             print(f"Successfully authenticated with Huckleberry API", file=sys.stderr)
 
