@@ -2,6 +2,7 @@
 
 import pytest
 from unittest.mock import AsyncMock, MagicMock, patch, Mock
+from zoneinfo import ZoneInfo
 from huckleberry_mcp.tools import sleep
 
 
@@ -17,6 +18,7 @@ def mock_api():
     api.cancel_sleep = MagicMock()  # Synchronous, not async
     api.get_sleep_intervals = MagicMock(return_value=[])  # Synchronous, not async
     api._get_timezone_offset_minutes = MagicMock(return_value=-300.0)  # EST offset
+    api._timezone = ZoneInfo("America/New_York")  # EST/EDT timezone
 
     # Mock Firestore client for log_sleep
     mock_firestore = MagicMock()

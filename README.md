@@ -88,9 +88,11 @@ Directly log a completed sleep session without using the timer. Useful for retro
 
 **Parameters**:
 - `child_uid` (string, required): The child's unique identifier
-- `start_time` (string, required): Sleep start time in ISO format (e.g., "2026-01-30T14:30:00" or "2026-01-30T14:30:00Z")
-- `end_time` (string, optional): Sleep end time in ISO format (provide this OR duration_minutes)
+- `start_time` (string, required): Sleep start time in ISO format. If no timezone specified (e.g., "2026-01-30T14:30:00"), interpreted as your configured timezone. For UTC, use "2026-01-30T14:30:00Z".
+- `end_time` (string, optional): Sleep end time in ISO format (provide this OR duration_minutes). Same timezone handling as start_time.
 - `duration_minutes` (integer, optional): Sleep duration in minutes (provide this OR end_time)
+
+**Timezone Note**: Times without timezone info are interpreted using your `HUCKLEBERRY_TIMEZONE` setting (e.g., "America/New_York"). This ensures times appear correctly in the Huckleberry app.
 
 **Example**: "Log a sleep session from 2pm to 4pm yesterday"
 

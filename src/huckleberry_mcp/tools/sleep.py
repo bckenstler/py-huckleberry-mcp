@@ -14,11 +14,28 @@ def iso_to_timestamp(iso_date: str) -> int:
     return int(dt.timestamp())
 
 
-def iso_datetime_to_timestamp(iso_datetime: str) -> int:
-    """Convert ISO datetime string to Unix timestamp (seconds)."""
+def iso_datetime_to_timestamp(iso_datetime: str, user_timezone=None) -> int:
+    """Convert ISO datetime string to Unix timestamp (seconds).
+
+    Args:
+        iso_datetime: ISO datetime string (e.g., "2026-01-25T08:15:00" or "2026-01-25T08:15:00Z")
+        user_timezone: ZoneInfo object representing user's timezone. If provided and iso_datetime
+                       has no timezone, interprets the datetime as being in this timezone.
+
+    Returns:
+        Unix timestamp in seconds
+    """
     dt = datetime.fromisoformat(iso_datetime.replace('Z', '+00:00'))
+
+    # If no timezone specified in the input string, use user's configured timezone
     if dt.tzinfo is None:
-        dt = dt.replace(tzinfo=timezone.utc)
+        if user_timezone is not None:
+            # Interpret as user's local time
+            dt = dt.replace(tzinfo=user_timezone)
+        else:
+            # Fallback to UTC if no user timezone provided
+            dt = dt.replace(tzinfo=timezone.utc)
+
     return int(dt.timestamp())
 
 
@@ -54,15 +71,18 @@ async def log_sleep(
         if end_time is not None and duration_minutes is not None:
             raise ValueError("Provide either end_time or duration_minutes, not both")
 
-        # Convert start time to timestamp
-        start_timestamp = iso_datetime_to_timestamp(start_time)
+        # Get user's timezone from API for proper timestamp conversion
+        user_timezone = api._timezone
+
+        # Convert start time to timestamp (using user's timezone for naive datetimes)
+        start_timestamp = iso_datetime_to_timestamp(start_time, user_timezone)
 
         # Calculate duration
         if duration_minutes is not None:
             duration_sec = duration_minutes * 60
             end_timestamp = start_timestamp + duration_sec
         else:
-            end_timestamp = iso_datetime_to_timestamp(end_time)
+            end_timestamp = iso_datetime_to_timestamp(end_time, user_timezone)
             duration_sec = end_timestamp - start_timestamp
 
             if duration_sec <= 0:
