@@ -83,8 +83,19 @@ List all child profiles with their UID, name, and birth date.
 
 ### Sleep Tracking
 
+#### `log_sleep`
+Directly log a completed sleep session without using the timer. Useful for retroactive logging or importing past sleep data.
+
+**Parameters**:
+- `child_uid` (string, required): The child's unique identifier
+- `start_time` (string, required): Sleep start time in ISO format (e.g., "2026-01-30T14:30:00" or "2026-01-30T14:30:00Z")
+- `end_time` (string, optional): Sleep end time in ISO format (provide this OR duration_minutes)
+- `duration_minutes` (integer, optional): Sleep duration in minutes (provide this OR end_time)
+
+**Example**: "Log a sleep session from 2pm to 4pm yesterday"
+
 #### `start_sleep`
-Begin a sleep tracking session for a child.
+Begin a sleep tracking session for a child using real-time timer.
 
 **Parameters**:
 - `child_uid` (string, required): The child's unique identifier
@@ -270,7 +281,9 @@ Once configured in Claude Desktop, you can interact with the server through natu
    - "Show me all my kids"
 
 2. **Track sleep**:
-   - "Start a sleep session for Alice"
+   - "Log a sleep session from 2pm to 4pm yesterday" (direct logging)
+   - "Log that Alice slept for 90 minutes starting at 1pm today" (direct logging)
+   - "Start a sleep session for Alice" (real-time timer)
    - "Alice is sleeping"
    - "Pause the sleep timer"
    - "Alice woke up, complete the sleep session"

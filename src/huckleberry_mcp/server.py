@@ -33,8 +33,22 @@ async def list_tools() -> list[Tool]:
 
         # Sleep tracking
         Tool(
+            name="log_sleep",
+            description="Directly log a completed sleep session without using the timer. Useful for retroactive logging or importing past sleep data. Provide either end_time or duration_minutes.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "child_uid": {"type": "string", "description": "The child's unique identifier"},
+                    "start_time": {"type": "string", "description": "Sleep start time in ISO format (e.g., '2026-01-30T14:30:00' or '2026-01-30T14:30:00Z')"},
+                    "end_time": {"type": "string", "description": "Sleep end time in ISO format (optional if duration_minutes provided)"},
+                    "duration_minutes": {"type": "integer", "description": "Sleep duration in minutes (optional if end_time provided)"}
+                },
+                "required": ["child_uid", "start_time"]
+            }
+        ),
+        Tool(
             name="start_sleep",
-            description="Begin a sleep tracking session for a child",
+            description="Begin a sleep tracking session for a child using real-time timer",
             inputSchema={
                 "type": "object",
                 "properties": {
@@ -268,6 +282,13 @@ async def call_tool(name: str, arguments: dict) -> list[TextContent]:
             result = await children.list_children()
 
         # Sleep tracking
+        elif name == "log_sleep":
+            result = await sleep.log_sleep(
+                arguments["child_uid"],
+                arguments["start_time"],
+                arguments.get("end_time"),
+                arguments.get("duration_minutes")
+            )
         elif name == "start_sleep":
             result = await sleep.start_sleep(arguments["child_uid"])
         elif name == "pause_sleep":
