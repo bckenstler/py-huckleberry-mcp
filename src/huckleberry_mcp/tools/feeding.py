@@ -24,6 +24,123 @@ from .children import validate_child_uid
 from ..utils import iso_to_timestamp, iso_datetime_to_timestamp, timestamp_to_local_iso
 
 
+async def log_bottle_feeding(
+    child_uid: str,
+    amount: float,
+    bottle_content: str = "formula",
+    units: str = "oz",
+    timestamp: Optional[str] = None
+) -> Dict[str, Any]:
+    """
+    Log a bottle feeding session.
+
+    Records a bottle feeding with the specified amount and content type. Supports
+    retroactive logging by providing an optional timestamp.
+
+    Args:
+        child_uid: The child's unique identifier (from list_children)
+        amount: Amount fed (in the specified units)
+        bottle_content: What was fed - one of "formula", "breast_milk", or "mixed"
+        units: Measurement units - "oz" (ounces) or "ml" (milliliters)
+        timestamp: When the feeding occurred in ISO format (e.g., "2026-01-30T14:30:00").
+                   Defaults to current time if not provided.
+
+    Returns:
+        Dict with keys:
+        - success (bool): True if feeding was logged
+        - message (str): Human-readable confirmation
+        - amount (float): Amount fed
+        - units (str): Measurement units used
+        - bottle_content (str): Type of feeding (formula, breast_milk, mixed)
+        - timestamp (str): Logged feeding time in local ISO format
+        - interval_id (str): Unique identifier for this feeding record
+
+    Raises:
+        ValueError: If bottle_content or units are invalid, or amount is not positive
+        Exception: When API fails
+    """
+    try:
+        await validate_child_uid(child_uid)
+        api = await get_authenticated_api()
+
+        # Validate bottle_content
+        valid_contents = ["formula", "breast_milk", "mixed"]
+        if bottle_content not in valid_contents:
+            raise ValueError(f"Invalid bottle_content '{bottle_content}'. Must be one of: {', '.join(valid_contents)}")
+
+        # Validate units
+        valid_units = ["oz", "ml"]
+        if units not in valid_units:
+            raise ValueError(f"Invalid units '{units}'. Must be one of: {', '.join(valid_units)}")
+
+        # Validate amount
+        if amount <= 0:
+            raise ValueError("Amount must be a positive number")
+
+        # Get user's timezone
+        user_timezone = api._timezone
+
+        # Determine feeding timestamp
+        current_time = time.time()
+        if timestamp is not None:
+            feed_timestamp = iso_datetime_to_timestamp(timestamp, user_timezone)
+        else:
+            feed_timestamp = current_time
+
+        # Access Firestore client directly (following library's internal pattern)
+        client = api._get_firestore_client()
+        feed_ref = client.collection("feed").document(child_uid)
+
+        # Generate interval ID (format: timestamp-random, matching complete_feeding)
+        interval_id = f"{int(current_time * 1000)}-{uuid.uuid4().hex[:20]}"
+
+        # Create interval document for bottle feeding
+        interval_data = {
+            "mode": "bottle",
+            "start": feed_timestamp,
+            "amount": amount,
+            "units": units,
+            "bottleContent": bottle_content,
+            "lastUpdated": current_time,
+            "offset": api._get_timezone_offset_minutes(),
+            "end_offset": api._get_timezone_offset_minutes(),
+        }
+
+        # Write to intervals subcollection
+        feed_ref.collection("intervals").document(interval_id).set(interval_data)
+
+        # Update prefs.lastBottle (matching pattern from other feeding types)
+        last_bottle_data = {
+            "mode": "bottle",
+            "start": feed_timestamp,
+            "amount": amount,
+            "units": units,
+            "bottleContent": bottle_content,
+            "offset": api._get_timezone_offset_minutes(),
+        }
+
+        feed_ref.update({
+            "prefs.lastBottle": last_bottle_data,
+            "prefs.timestamp": {"seconds": current_time},
+            "prefs.local_timestamp": current_time,
+        })
+
+        return {
+            "success": True,
+            "message": f"Bottle feeding logged: {amount}{units} of {bottle_content.replace('_', ' ')} for child {child_uid}",
+            "amount": amount,
+            "units": units,
+            "bottle_content": bottle_content,
+            "timestamp": timestamp_to_local_iso(feed_timestamp, user_timezone),
+            "interval_id": interval_id
+        }
+
+    except ValueError as e:
+        raise
+    except Exception as e:
+        raise Exception(f"Failed to log bottle feeding: {str(e)}")
+
+
 async def log_breastfeeding(
     child_uid: str,
     start_time: str,
@@ -500,6 +617,7 @@ async def get_feeding_history(
 
 def register_feeding_tools(mcp):
     """Register feeding tracking tools with FastMCP instance."""
+    mcp.tool()(log_bottle_feeding)
     mcp.tool()(log_breastfeeding)
     mcp.tool()(start_breastfeeding)
     mcp.tool()(pause_feeding)
