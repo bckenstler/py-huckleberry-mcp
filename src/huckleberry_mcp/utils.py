@@ -48,3 +48,20 @@ def iso_datetime_to_timestamp(iso_datetime: str, user_timezone=None) -> int:
             dt = dt.replace(tzinfo=timezone.utc)
 
     return int(dt.timestamp())
+
+
+def timestamp_to_local_iso(timestamp: float, user_timezone=None) -> str:
+    """Convert Unix timestamp to ISO string in user's local timezone.
+
+    Args:
+        timestamp: Unix timestamp in seconds
+        user_timezone: ZoneInfo object representing user's timezone. If provided,
+                       the returned ISO string will be in this timezone.
+
+    Returns:
+        ISO datetime string in user's local timezone (or UTC if no timezone provided)
+    """
+    dt = datetime.fromtimestamp(timestamp, tz=timezone.utc)
+    if user_timezone:
+        dt = dt.astimezone(user_timezone)
+    return dt.isoformat()

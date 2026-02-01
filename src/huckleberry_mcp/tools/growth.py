@@ -6,7 +6,7 @@ from typing import Any, Dict, List, Optional
 from datetime import datetime, timezone, timedelta
 from ..auth import get_authenticated_api
 from .children import validate_child_uid
-from ..utils import iso_to_timestamp, iso_datetime_to_timestamp
+from ..utils import iso_to_timestamp, iso_datetime_to_timestamp, timestamp_to_local_iso
 
 
 async def log_growth(
@@ -117,8 +117,8 @@ async def log_growth(
             unit = "in" if units == "imperial" else "cm"
             measurements.append(f"head: {head}{unit}")
 
-        # Convert timestamp for response
-        timestamp_dt = datetime.fromtimestamp(measurement_time, tz=timezone.utc)
+        # Get user's timezone for response
+        user_timezone = api._timezone
 
         return {
             "success": True,
@@ -127,7 +127,7 @@ async def log_growth(
             "height": height,
             "head": head,
             "units": units,
-            "timestamp": timestamp_dt.isoformat()
+            "timestamp": timestamp_to_local_iso(measurement_time, user_timezone)
         }
 
     except ValueError as e:
@@ -157,6 +157,12 @@ async def get_latest_growth(child_uid: str) -> Dict[str, Any]:
                 "message": "No growth measurements found for this child"
             }
 
+        # Convert timestamp to user's timezone if available
+        timestamp_sec = growth_data.get("timestamp_sec")
+        timestamp_str = None
+        if timestamp_sec:
+            timestamp_str = timestamp_to_local_iso(timestamp_sec, api._timezone)
+
         return {
             "weight": growth_data.get("weight"),
             "height": growth_data.get("height"),
@@ -164,7 +170,7 @@ async def get_latest_growth(child_uid: str) -> Dict[str, Any]:
             "weight_units": growth_data.get("weight_units"),
             "height_units": growth_data.get("height_units"),
             "head_units": growth_data.get("head_units"),
-            "timestamp": growth_data.get("timestamp_sec"),
+            "timestamp": timestamp_str,
         }
 
     except Exception as e:
@@ -210,8 +216,8 @@ async def get_growth_history(
 
         result = []
         for entry in entries:
-            # Convert timestamp to ISO format
-            timestamp = datetime.fromtimestamp(entry["start"], tz=timezone.utc).isoformat()
+            # Convert timestamp to ISO format in user's timezone
+            timestamp = timestamp_to_local_iso(entry["start"], user_timezone)
 
             result.append({
                 "timestamp": timestamp,

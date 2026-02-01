@@ -6,7 +6,7 @@ from typing import Any, Dict, List, Optional
 from datetime import datetime, timezone, timedelta
 from ..auth import get_authenticated_api
 from .children import validate_child_uid
-from ..utils import iso_to_timestamp, iso_datetime_to_timestamp
+from ..utils import iso_to_timestamp, iso_datetime_to_timestamp, timestamp_to_local_iso
 
 
 async def log_breastfeeding(
@@ -133,13 +133,10 @@ async def log_breastfeeding(
             "prefs.local_timestamp": current_time,
         })
 
-        # Convert timestamp for response
-        start_dt = datetime.fromtimestamp(start_timestamp, tz=timezone.utc)
-
         return {
             "success": True,
             "message": f"Breastfeeding logged for child {child_uid}",
-            "start_time": start_dt.isoformat(),
+            "start_time": timestamp_to_local_iso(start_timestamp, user_timezone),
             "left_duration_minutes": int(left_duration),
             "right_duration_minutes": int(right_duration),
             "total_duration_minutes": int(total_duration),
@@ -181,7 +178,7 @@ async def start_breastfeeding(child_uid: str, side: str) -> Dict[str, Any]:
             "success": True,
             "message": f"Breastfeeding started on {side} side for child {child_uid}",
             "side": side.lower(),
-            "timestamp": datetime.now().isoformat()
+            "timestamp": timestamp_to_local_iso(time.time(), api._timezone)
         }
 
     except ValueError as e:
@@ -211,7 +208,7 @@ async def pause_feeding(child_uid: str) -> Dict[str, Any]:
         return {
             "success": True,
             "message": f"Feeding tracking paused for child {child_uid}",
-            "timestamp": datetime.now().isoformat()
+            "timestamp": timestamp_to_local_iso(time.time(), api._timezone)
         }
 
     except ValueError as e:
@@ -241,7 +238,7 @@ async def resume_feeding(child_uid: str) -> Dict[str, Any]:
         return {
             "success": True,
             "message": f"Feeding tracking resumed for child {child_uid}",
-            "timestamp": datetime.now().isoformat()
+            "timestamp": timestamp_to_local_iso(time.time(), api._timezone)
         }
 
     except ValueError as e:
@@ -271,7 +268,7 @@ async def switch_feeding_side(child_uid: str) -> Dict[str, Any]:
         return {
             "success": True,
             "message": "Switched feeding side",
-            "timestamp": datetime.now().isoformat()
+            "timestamp": timestamp_to_local_iso(time.time(), api._timezone)
         }
 
     except ValueError as e:
@@ -301,7 +298,7 @@ async def complete_feeding(child_uid: str) -> Dict[str, Any]:
         return {
             "success": True,
             "message": f"Feeding tracking completed and saved for child {child_uid}",
-            "timestamp": datetime.now().isoformat()
+            "timestamp": timestamp_to_local_iso(time.time(), api._timezone)
         }
 
     except ValueError as e:
@@ -331,7 +328,7 @@ async def cancel_feeding(child_uid: str) -> Dict[str, Any]:
         return {
             "success": True,
             "message": f"Feeding tracking cancelled for child {child_uid}",
-            "timestamp": datetime.now().isoformat()
+            "timestamp": timestamp_to_local_iso(time.time(), api._timezone)
         }
 
     except ValueError as e:
@@ -380,8 +377,8 @@ async def get_feeding_history(
 
         result = []
         for interval in intervals:
-            # Convert timestamp to ISO format
-            start_time = datetime.fromtimestamp(interval["start"], tz=timezone.utc).isoformat()
+            # Convert timestamp to ISO format in user's timezone
+            start_time = timestamp_to_local_iso(interval["start"], user_timezone)
 
             # Check if multi-entry (backend returns seconds for those, minutes for regular)
             if interval.get("is_multi_entry", False):

@@ -6,7 +6,7 @@ from typing import Any, Dict, List, Optional
 from datetime import datetime, timezone, timedelta
 from ..auth import get_authenticated_api
 from .children import validate_child_uid
-from ..utils import iso_to_timestamp, iso_datetime_to_timestamp
+from ..utils import iso_to_timestamp, iso_datetime_to_timestamp, timestamp_to_local_iso
 
 
 async def log_diaper(
@@ -140,8 +140,8 @@ async def log_diaper(
         if consistency:
             message_parts.append(f"consistency: {consistency}")
 
-        # Convert timestamp for response
-        timestamp_dt = datetime.fromtimestamp(change_time, tz=timezone.utc)
+        # Get user's timezone for response
+        user_timezone = api._timezone
 
         return {
             "success": True,
@@ -149,7 +149,7 @@ async def log_diaper(
             "mode": mode,
             "color": color,
             "consistency": consistency,
-            "timestamp": timestamp_dt.isoformat()
+            "timestamp": timestamp_to_local_iso(change_time, user_timezone)
         }
 
     except ValueError as e:
@@ -197,8 +197,8 @@ async def get_diaper_history(
 
         result = []
         for interval in intervals:
-            # Convert timestamp to ISO format
-            timestamp = datetime.fromtimestamp(interval["start"], tz=timezone.utc).isoformat()
+            # Convert timestamp to ISO format in user's timezone
+            timestamp = timestamp_to_local_iso(interval["start"], user_timezone)
 
             result.append({
                 "timestamp": timestamp,

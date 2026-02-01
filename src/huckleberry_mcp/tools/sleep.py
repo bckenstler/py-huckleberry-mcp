@@ -6,7 +6,7 @@ from typing import Any, Dict, List, Optional
 from datetime import datetime, timezone, timedelta
 from ..auth import get_authenticated_api
 from .children import validate_child_uid
-from ..utils import iso_to_timestamp, iso_datetime_to_timestamp
+from ..utils import iso_to_timestamp, iso_datetime_to_timestamp, timestamp_to_local_iso
 
 
 async def log_sleep(
@@ -117,15 +117,11 @@ async def log_sleep(
             "prefs.local_timestamp": current_time,
         })
 
-        # Convert timestamps for response
-        start_dt = datetime.fromtimestamp(start_timestamp, tz=timezone.utc)
-        end_dt = datetime.fromtimestamp(end_timestamp, tz=timezone.utc)
-
         return {
             "success": True,
             "message": f"Sleep logged for child {child_uid}",
-            "start_time": start_dt.isoformat(),
-            "end_time": end_dt.isoformat(),
+            "start_time": timestamp_to_local_iso(start_timestamp, user_timezone),
+            "end_time": timestamp_to_local_iso(end_timestamp, user_timezone),
             "duration_minutes": duration_sec // 60,
             "interval_id": interval_id
         }
@@ -156,7 +152,7 @@ async def start_sleep(child_uid: str) -> Dict[str, Any]:
         return {
             "success": True,
             "message": f"Sleep tracking started for child {child_uid}",
-            "timestamp": datetime.now().isoformat()
+            "timestamp": timestamp_to_local_iso(time.time(), api._timezone)
         }
 
     except ValueError as e:
@@ -185,7 +181,7 @@ async def pause_sleep(child_uid: str) -> Dict[str, Any]:
         return {
             "success": True,
             "message": f"Sleep tracking paused for child {child_uid}",
-            "timestamp": datetime.now().isoformat()
+            "timestamp": timestamp_to_local_iso(time.time(), api._timezone)
         }
 
     except ValueError as e:
@@ -214,7 +210,7 @@ async def resume_sleep(child_uid: str) -> Dict[str, Any]:
         return {
             "success": True,
             "message": f"Sleep tracking resumed for child {child_uid}",
-            "timestamp": datetime.now().isoformat()
+            "timestamp": timestamp_to_local_iso(time.time(), api._timezone)
         }
 
     except ValueError as e:
@@ -243,7 +239,7 @@ async def complete_sleep(child_uid: str) -> Dict[str, Any]:
         return {
             "success": True,
             "message": f"Sleep tracking completed and saved for child {child_uid}",
-            "timestamp": datetime.now().isoformat()
+            "timestamp": timestamp_to_local_iso(time.time(), api._timezone)
         }
 
     except ValueError as e:
@@ -272,7 +268,7 @@ async def cancel_sleep(child_uid: str) -> Dict[str, Any]:
         return {
             "success": True,
             "message": f"Sleep tracking cancelled for child {child_uid}",
-            "timestamp": datetime.now().isoformat()
+            "timestamp": timestamp_to_local_iso(time.time(), api._timezone)
         }
 
     except ValueError as e:
@@ -320,9 +316,9 @@ async def get_sleep_history(
 
         result = []
         for interval in intervals:
-            # Convert timestamps to ISO format
-            start_time = datetime.fromtimestamp(interval["start"], tz=timezone.utc).isoformat()
-            end_time = datetime.fromtimestamp(interval["end"], tz=timezone.utc).isoformat() if "end" in interval else None
+            # Convert timestamps to ISO format in user's timezone
+            start_time = timestamp_to_local_iso(interval["start"], user_timezone)
+            end_time = timestamp_to_local_iso(interval["end"], user_timezone) if "end" in interval else None
 
             result.append({
                 "start_time": start_time,
