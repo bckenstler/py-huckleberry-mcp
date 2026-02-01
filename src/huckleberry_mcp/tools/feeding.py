@@ -481,15 +481,9 @@ async def get_feeding_history(
             # Convert timestamp to ISO format in user's timezone
             start_time = timestamp_to_local_iso(interval["start"], user_timezone)
 
-            # Check if multi-entry (backend returns seconds for those, minutes for regular)
-            if interval.get("is_multi_entry", False):
-                # Multi-entry: backend returns seconds, convert to minutes
-                left_mins = interval.get("leftDuration", 0) // 60
-                right_mins = interval.get("rightDuration", 0) // 60
-            else:
-                # Regular entry: backend already returns minutes
-                left_mins = interval.get("leftDuration", 0)
-                right_mins = interval.get("rightDuration", 0)
+            # Backend returns duration in seconds, convert to minutes
+            left_mins = interval.get("leftDuration", 0) // 60
+            right_mins = interval.get("rightDuration", 0) // 60
 
             result.append({
                 "start_time": start_time,
