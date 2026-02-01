@@ -1,4 +1,18 @@
-"""Sleep tracking tools for Huckleberry MCP server."""
+"""Sleep tracking tools for Huckleberry MCP server.
+
+Timer State Machine
+-------------------
+Sleep sessions follow this state machine: IDLE -> RUNNING <-> PAUSED -> COMPLETED/CANCELLED
+
+Valid operations by state:
+- start_sleep: IDLE -> RUNNING (fails if session already active for this child)
+- pause_sleep: RUNNING -> PAUSED (fails if not running)
+- resume_sleep: PAUSED -> RUNNING (fails if not paused)
+- complete_sleep: RUNNING/PAUSED -> saved to history (fails if no active session)
+- cancel_sleep: RUNNING/PAUSED -> discarded (fails if no active session)
+
+Only one sleep session can be active per child at a time.
+"""
 
 import time
 import uuid
@@ -17,19 +31,28 @@ async def log_sleep(
 ) -> Dict[str, Any]:
     """
     Directly log a completed sleep session without using the timer.
-    Useful for retroactive logging or importing sleep data.
+
+    Useful for retroactive logging or importing sleep data. Does not require
+    an active timer session.
 
     Args:
-        child_uid: The child's unique identifier
+        child_uid: The child's unique identifier (from list_children)
         start_time: Sleep start time in ISO format (e.g., "2026-01-30T14:30:00" or "2026-01-30T14:30:00Z")
         end_time: Sleep end time in ISO format (optional if duration_minutes provided)
         duration_minutes: Sleep duration in minutes (optional if end_time provided)
 
     Returns:
-        Status message confirming sleep logged with details
+        Dict with keys:
+        - success (bool): True if sleep was logged
+        - message (str): Human-readable confirmation
+        - start_time (str): Logged start time in local ISO format
+        - end_time (str): Logged end time in local ISO format
+        - duration_minutes (int): Total sleep duration in minutes
+        - interval_id (str): Unique identifier for this sleep record
 
     Raises:
         ValueError: If neither end_time nor duration_minutes is provided, or if both are provided
+        Exception: When API fails
     """
     try:
         await validate_child_uid(child_uid)
@@ -136,11 +159,21 @@ async def start_sleep(child_uid: str) -> Dict[str, Any]:
     """
     Begin a sleep tracking session.
 
+    Starts the sleep timer for the specified child. Only one sleep session
+    can be active per child at a time.
+
     Args:
-        child_uid: The child's unique identifier
+        child_uid: The child's unique identifier (from list_children)
 
     Returns:
-        Status message confirming sleep session started
+        Dict with keys:
+        - success (bool): True if session started
+        - message (str): Human-readable confirmation
+        - timestamp (str): Session start time in local ISO format
+
+    Raises:
+        ValueError: If child_uid is invalid
+        Exception: If a sleep session is already active for this child, or API fails
     """
     try:
         await validate_child_uid(child_uid)
@@ -166,10 +199,20 @@ async def pause_sleep(child_uid: str) -> Dict[str, Any]:
     Pause an active sleep tracking session.
 
     Args:
-        child_uid: The child's unique identifier
+        child_uid: The child's unique identifier (from list_children)
 
     Returns:
-        Status message confirming sleep session paused
+        Dict with keys:
+        - success (bool): True if session paused
+        - message (str): Human-readable confirmation
+        - timestamp (str): Pause time in local ISO format
+
+    Raises:
+        ValueError: If child_uid is invalid
+        Exception: If no active (running) sleep session exists, or API fails
+
+    Precondition:
+        A sleep session must be active and running (started via start_sleep, not paused).
     """
     try:
         await validate_child_uid(child_uid)
@@ -195,10 +238,20 @@ async def resume_sleep(child_uid: str) -> Dict[str, Any]:
     Resume a paused sleep tracking session.
 
     Args:
-        child_uid: The child's unique identifier
+        child_uid: The child's unique identifier (from list_children)
 
     Returns:
-        Status message confirming sleep session resumed
+        Dict with keys:
+        - success (bool): True if session resumed
+        - message (str): Human-readable confirmation
+        - timestamp (str): Resume time in local ISO format
+
+    Raises:
+        ValueError: If child_uid is invalid
+        Exception: If no paused sleep session exists, or API fails
+
+    Precondition:
+        A sleep session must be paused (via pause_sleep).
     """
     try:
         await validate_child_uid(child_uid)
@@ -223,11 +276,23 @@ async def complete_sleep(child_uid: str) -> Dict[str, Any]:
     """
     Complete and save a sleep tracking session.
 
+    Ends the active sleep session and saves it to the child's sleep history.
+
     Args:
-        child_uid: The child's unique identifier
+        child_uid: The child's unique identifier (from list_children)
 
     Returns:
-        Status message confirming sleep session completed
+        Dict with keys:
+        - success (bool): True if session completed and saved
+        - message (str): Human-readable confirmation
+        - timestamp (str): Completion time in local ISO format
+
+    Raises:
+        ValueError: If child_uid is invalid
+        Exception: If no active sleep session exists (running or paused), or API fails
+
+    Precondition:
+        A sleep session must be active (running or paused).
     """
     try:
         await validate_child_uid(child_uid)
@@ -252,11 +317,23 @@ async def cancel_sleep(child_uid: str) -> Dict[str, Any]:
     """
     Cancel and discard a sleep tracking session.
 
+    Ends the active sleep session without saving it. The session data is discarded.
+
     Args:
-        child_uid: The child's unique identifier
+        child_uid: The child's unique identifier (from list_children)
 
     Returns:
-        Status message confirming sleep session cancelled
+        Dict with keys:
+        - success (bool): True if session cancelled
+        - message (str): Human-readable confirmation
+        - timestamp (str): Cancellation time in local ISO format
+
+    Raises:
+        ValueError: If child_uid is invalid
+        Exception: If no active sleep session exists (running or paused), or API fails
+
+    Precondition:
+        A sleep session must be active (running or paused).
     """
     try:
         await validate_child_uid(child_uid)
@@ -286,12 +363,18 @@ async def get_sleep_history(
     Get sleep history for a child.
 
     Args:
-        child_uid: The child's unique identifier
-        start_date: Start date in ISO format (YYYY-MM-DD), optional
-        end_date: End date in ISO format (YYYY-MM-DD), optional
+        child_uid: The child's unique identifier (from list_children)
+        start_date: Start date in ISO format (YYYY-MM-DD), defaults to 7 days ago
+        end_date: End date in ISO format (YYYY-MM-DD), defaults to today
 
     Returns:
-        List of sleep events with start time, end time, and duration
+        List of dicts, each containing:
+        - start_time (str): Sleep start time in local ISO format
+        - end_time (str | None): Sleep end time in local ISO format, None if ongoing
+        - duration_minutes (int): Total sleep duration in minutes
+
+    Raises:
+        Exception: When API fails
     """
     try:
         await validate_child_uid(child_uid)

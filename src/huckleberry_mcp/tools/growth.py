@@ -20,16 +20,29 @@ async def log_growth(
     """
     Log growth measurements.
 
+    At least one measurement (weight, height, or head) must be provided.
+
     Args:
-        child_uid: The child's unique identifier
-        weight: Weight measurement (lbs if imperial, kg if metric)
-        height: Height measurement (inches if imperial, cm if metric)
-        head: Head circumference (inches if imperial, cm if metric)
-        units: Measurement system ("imperial" or "metric")
+        child_uid: The child's unique identifier (from list_children)
+        weight: Weight measurement (lbs if imperial, kg if metric) (optional)
+        height: Height measurement (inches if imperial, cm if metric) (optional)
+        head: Head circumference (inches if imperial, cm if metric) (optional)
+        units: Measurement system - "imperial" or "metric" (default "imperial")
         timestamp: Optional timestamp in ISO format for retroactive logging. If not provided, uses current time.
 
     Returns:
-        Status message confirming growth measurements logged
+        Dict with keys:
+        - success (bool): True if measurements were logged
+        - message (str): Human-readable confirmation with recorded values
+        - weight (float | None): Logged weight value, None if not provided
+        - height (float | None): Logged height value, None if not provided
+        - head (float | None): Logged head circumference, None if not provided
+        - units (str): Measurement system used ("imperial" or "metric")
+        - timestamp (str): Logged time in local ISO format
+
+    Raises:
+        ValueError: If units is invalid or no measurements provided
+        Exception: When API fails
     """
     try:
         await validate_child_uid(child_uid)
@@ -141,10 +154,23 @@ async def get_latest_growth(child_uid: str) -> Dict[str, Any]:
     Get the latest growth measurements for a child.
 
     Args:
-        child_uid: The child's unique identifier
+        child_uid: The child's unique identifier (from list_children)
 
     Returns:
-        Latest growth measurements with timestamp
+        Dict with keys (when measurements exist):
+        - weight (float | None): Latest weight value
+        - height (float | None): Latest height value
+        - head (float | None): Latest head circumference
+        - weight_units (str | None): Units for weight ("lbs" or "kg")
+        - height_units (str | None): Units for height ("in" or "cm")
+        - head_units (str | None): Units for head circumference
+        - timestamp (str | None): Measurement time in local ISO format
+
+        OR when no measurements exist:
+        - message (str): "No growth measurements found for this child"
+
+    Raises:
+        Exception: When API fails
     """
     try:
         await validate_child_uid(child_uid)
@@ -186,12 +212,19 @@ async def get_growth_history(
     Get growth measurement history for a child.
 
     Args:
-        child_uid: The child's unique identifier
-        start_date: Start date in ISO format (YYYY-MM-DD), optional
-        end_date: End date in ISO format (YYYY-MM-DD), optional
+        child_uid: The child's unique identifier (from list_children)
+        start_date: Start date in ISO format (YYYY-MM-DD), defaults to 30 days ago
+        end_date: End date in ISO format (YYYY-MM-DD), defaults to today
 
     Returns:
-        List of growth measurements with details
+        List of dicts, each containing:
+        - timestamp (str): Measurement time in local ISO format
+        - weight (float | None): Weight value if recorded, None otherwise
+        - height (float | None): Height value if recorded, None otherwise
+        - head (float | None): Head circumference if recorded, None otherwise
+
+    Raises:
+        Exception: When API fails
     """
     try:
         await validate_child_uid(child_uid)
