@@ -6,53 +6,7 @@ from typing import Any, Dict, List, Optional
 from datetime import datetime, timezone, timedelta
 from ..auth import get_authenticated_api
 from .children import validate_child_uid
-
-
-def iso_to_timestamp(iso_date: str, user_timezone=None) -> int:
-    """Convert ISO date string (YYYY-MM-DD) to Unix timestamp.
-
-    Args:
-        iso_date: Date string in YYYY-MM-DD format
-        user_timezone: ZoneInfo object. If provided, interprets date as midnight in this timezone.
-                      Otherwise defaults to UTC.
-
-    Returns:
-        Unix timestamp in seconds
-    """
-    dt = datetime.fromisoformat(iso_date)
-
-    # Apply timezone (user's local or UTC)
-    if user_timezone is not None:
-        dt = dt.replace(tzinfo=user_timezone)
-    else:
-        dt = dt.replace(tzinfo=timezone.utc)
-
-    return int(dt.timestamp())
-
-
-def iso_datetime_to_timestamp(iso_datetime: str, user_timezone=None) -> int:
-    """Convert ISO datetime string to Unix timestamp (seconds).
-
-    Args:
-        iso_datetime: ISO datetime string (e.g., "2026-01-25T08:15:00" or "2026-01-25T08:15:00Z")
-        user_timezone: ZoneInfo object representing user's timezone. If provided and iso_datetime
-                       has no timezone, interprets the datetime as being in this timezone.
-
-    Returns:
-        Unix timestamp in seconds
-    """
-    dt = datetime.fromisoformat(iso_datetime.replace('Z', '+00:00'))
-
-    # If no timezone specified in the input string, use user's configured timezone
-    if dt.tzinfo is None:
-        if user_timezone is not None:
-            # Interpret as user's local time
-            dt = dt.replace(tzinfo=user_timezone)
-        else:
-            # Fallback to UTC if no user timezone provided
-            dt = dt.replace(tzinfo=timezone.utc)
-
-    return int(dt.timestamp())
+from ..utils import iso_to_timestamp, iso_datetime_to_timestamp
 
 
 async def log_sleep(
@@ -380,3 +334,14 @@ async def get_sleep_history(
 
     except Exception as e:
         raise Exception(f"Failed to get sleep history: {str(e)}")
+
+
+def register_sleep_tools(mcp):
+    """Register sleep tracking tools with FastMCP instance."""
+    mcp.tool()(log_sleep)
+    mcp.tool()(start_sleep)
+    mcp.tool()(pause_sleep)
+    mcp.tool()(resume_sleep)
+    mcp.tool()(complete_sleep)
+    mcp.tool()(cancel_sleep)
+    mcp.tool()(get_sleep_history)

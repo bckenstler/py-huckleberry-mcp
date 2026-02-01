@@ -1,6 +1,6 @@
 # Huckleberry MCP Server
 
-A Model Context Protocol (MCP) server that interfaces with the Huckleberry baby tracking API, enabling Claude to help you track your baby's sleep, feeding, diaper changes, and growth measurements through natural conversation.
+A Model Context Protocol (MCP) server built with FastMCP that interfaces with the Huckleberry baby tracking API, enabling Claude to help you track your baby's sleep, feeding, diaper changes, and growth measurements through natural conversation.
 
 ## Features
 
@@ -33,6 +33,24 @@ uv sync
 cd /path/to/huckleberry-mcp
 pip install -e .
 ```
+
+## Architecture
+
+This server uses the [FastMCP](https://github.com/jlowin/fastmcp) framework for rapid MCP server development. FastMCP provides:
+
+- Automatic tool registration via decorators
+- Schema generation from type hints and docstrings
+- Built-in error handling and protocol compliance
+- Support for multiple transport types (STDIO, HTTP)
+
+The server implements 22 tools across 5 categories:
+- Child Management (2 tools)
+- Sleep Tracking (7 tools)
+- Feeding Tracking (8 tools)
+- Diaper Tracking (2 tools)
+- Growth Tracking (3 tools)
+
+All tools use lazy authentication - credentials are validated on first tool use rather than at server startup.
 
 ## Authentication Setup
 
@@ -349,40 +367,67 @@ Once configured in Claude Desktop, you can interact with the server through natu
 
 ## Development
 
-### Running Tests
-
-All tests pass and accurately reflect the actual Huckleberry API:
-
-```bash
-# Using uv
-uv run pytest tests/ -v
-
-# Using pip
-pytest tests/ -v
-```
-
 ### Project Structure
 
 ```
-huckleberry-mcp/
-├── src/
-│   └── huckleberry_mcp/
-│       ├── __init__.py
-│       ├── server.py              # Main MCP server entry point
-│       ├── auth.py                # Authentication handler
-│       └── tools/
-│           ├── __init__.py
-│           ├── children.py        # Child management tools
-│           ├── sleep.py           # Sleep tracking tools
-│           ├── feeding.py         # Feeding tracking tools
-│           ├── diaper.py          # Diaper logging tools
-│           └── growth.py          # Growth measurement tools
-├── tests/                         # Test suite (36 tests, all passing)
-├── pyproject.toml                 # Project configuration
-├── README.md                      # This file
-├── .env.example                   # Example environment variables
-└── .gitignore
+src/huckleberry_mcp/
+├── server.py          # FastMCP server instance and tool registration
+├── auth.py            # Authentication handling (lazy singleton pattern)
+├── utils.py           # Shared utilities (ISO timestamp conversion)
+└── tools/             # Tool implementations
+    ├── children.py    # Child management tools
+    ├── sleep.py       # Sleep tracking tools
+    ├── feeding.py     # Feeding/breastfeeding tools
+    ├── diaper.py      # Diaper logging tools
+    └── growth.py      # Growth measurement tools
 ```
+
+### Adding New Tools
+
+To add a new tool:
+
+1. Add the function to the appropriate module in `tools/`
+2. Decorate with `@mcp.tool()`
+3. Add comprehensive docstring (used for schema generation)
+4. Use type hints for parameter validation
+5. Register in `server.py` if creating new module
+
+Example:
+```python
+@mcp.tool()
+async def my_new_tool(child_uid: str, data: str) -> Dict[str, Any]:
+    """Tool description here.
+
+    Args:
+        child_uid: The child's unique identifier
+        data: Some data parameter
+
+    Returns:
+        Status message and data
+    """
+    api = await get_authenticated_api()
+    # Implementation...
+    return {"success": True, "message": "Done"}
+```
+
+### Running Tests
+
+```bash
+# Run all tests
+uv run pytest tests/ -v
+
+# Run specific test file
+uv run pytest tests/test_sleep.py -v
+
+# Run with coverage
+uv run pytest tests/ --cov=huckleberry_mcp --cov-report=html
+```
+
+### Dependencies
+
+- `fastmcp>=2.0.0,<3.0.0` - FastMCP framework for MCP server implementation
+- `huckleberry-api>=0.1.0` - Huckleberry API client library
+- `python-dotenv>=1.0.0` - Environment variable management
 
 ## Implementation Notes
 
@@ -450,6 +495,19 @@ MIT License - See LICENSE file for details
 - Built with the [Model Context Protocol](https://modelcontextprotocol.io/)
 - Uses the [py-huckleberry-api](https://github.com/Woyken/py-huckleberry-api) Python library
 - Powered by Claude from Anthropic
+
+## Migration History
+
+### v0.2.0 - FastMCP Migration (2026-01-31)
+
+Migrated from raw MCP SDK to FastMCP framework:
+- Reduced server.py from 442 to 47 lines
+- Eliminated manual schema definitions (270+ lines)
+- Consolidated duplicated timestamp utilities
+- Preserved lazy authentication pattern
+- Maintained all existing functionality
+
+All existing tools and features remain unchanged for end users.
 
 ## Support
 

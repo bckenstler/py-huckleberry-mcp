@@ -5,7 +5,7 @@ description = "MCP server for Huckleberry baby tracking API"
 readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [
-    "mcp>=1.2.0",
+    "fastmcp>=2.0.0,<3.0.0",
     "huckleberry-api>=0.1.0",
     "python-dotenv>=1.0.0",
 ]
