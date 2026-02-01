@@ -383,10 +383,20 @@ async def get_feeding_history(
             # Convert timestamp to ISO format
             start_time = datetime.fromtimestamp(interval["start"], tz=timezone.utc).isoformat()
 
+            # Check if multi-entry (backend returns seconds for those, minutes for regular)
+            if interval.get("is_multi_entry", False):
+                # Multi-entry: backend returns seconds, convert to minutes
+                left_mins = interval.get("leftDuration", 0) // 60
+                right_mins = interval.get("rightDuration", 0) // 60
+            else:
+                # Regular entry: backend already returns minutes
+                left_mins = interval.get("leftDuration", 0)
+                right_mins = interval.get("rightDuration", 0)
+
             result.append({
                 "start_time": start_time,
-                "left_duration_minutes": interval.get("leftDuration", 0),
-                "right_duration_minutes": interval.get("rightDuration", 0),
+                "left_duration_minutes": left_mins,
+                "right_duration_minutes": right_mins,
                 "is_multi_entry": interval.get("is_multi_entry", False),
             })
 

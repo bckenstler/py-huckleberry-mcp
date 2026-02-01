@@ -327,7 +327,7 @@ async def get_sleep_history(
             result.append({
                 "start_time": start_time,
                 "end_time": end_time,
-                "duration_minutes": interval.get("duration", 0),
+                "duration_minutes": interval.get("duration", 0) // 60,  # Convert backend seconds to user minutes
             })
 
         return result

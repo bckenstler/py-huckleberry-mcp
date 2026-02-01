@@ -109,11 +109,12 @@ async def test_cancel_sleep_success(mock_api):
 async def test_get_sleep_history(mock_api):
     """Test getting sleep history."""
     # Mock get_sleep_intervals to return intervals with 'start', 'end', 'duration'
+    # Backend returns duration in seconds
     mock_api.get_sleep_intervals = MagicMock(return_value=[
         {
             "start": 1704103200,  # Unix timestamp
             "end": 1704110400,
-            "duration": 120
+            "duration": 120  # Backend returns seconds
         }
     ])
 
@@ -123,7 +124,7 @@ async def test_get_sleep_history(mock_api):
         result = await sleep.get_sleep_history("child1", "2024-01-01", "2024-01-02")
 
         assert len(result) == 1
-        assert result[0]["duration_minutes"] == 120
+        assert result[0]["duration_minutes"] == 2  # 120 seconds / 60 = 2 minutes
 
 
 @pytest.mark.asyncio

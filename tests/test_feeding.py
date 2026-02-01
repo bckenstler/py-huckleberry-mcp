@@ -211,3 +211,28 @@ async def test_log_breastfeeding_invalid_last_side(mock_api):
                 left_duration_minutes=10,
                 last_side="middle"
             )
+
+
+@pytest.mark.asyncio
+async def test_get_feeding_history_multi_entry(mock_api):
+    """Test getting feeding history with multi-entry (seconds conversion)."""
+    # Mock get_feed_intervals to return multi-entry intervals
+    # Backend returns duration in seconds for multi-entry
+    mock_api.get_feed_intervals = MagicMock(return_value=[
+        {
+            "start": 1704103200,  # Unix timestamp
+            "leftDuration": 600,  # 600 seconds = 10 minutes
+            "rightDuration": 900,  # 900 seconds = 15 minutes
+            "is_multi_entry": True
+        }
+    ])
+
+    with patch("huckleberry_mcp.tools.feeding.get_authenticated_api", return_value=mock_api), \
+         patch("huckleberry_mcp.tools.children.get_authenticated_api", return_value=mock_api):
+
+        result = await feeding.get_feeding_history("child1", "2024-01-01", "2024-01-02")
+
+        assert len(result) == 1
+        assert result[0]["left_duration_minutes"] == 10  # 600 seconds / 60 = 10 minutes
+        assert result[0]["right_duration_minutes"] == 15  # 900 seconds / 60 = 15 minutes
+        assert result[0]["is_multi_entry"] is True
