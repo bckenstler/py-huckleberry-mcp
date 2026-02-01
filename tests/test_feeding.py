@@ -237,3 +237,116 @@ async def test_get_feeding_history_multi_entry(mock_api):
         assert result[0]["left_duration_minutes"] == 10  # 600 seconds / 60 = 10 minutes
         assert result[0]["right_duration_minutes"] == 15  # 900 seconds / 60 = 15 minutes
         assert result[0]["is_multi_entry"] is True
+
+
+# ============== Bottle Feeding Tests ==============
+
+@pytest.mark.asyncio
+async def test_log_bottle_feeding_success(mock_api):
+    """Test logging bottle feeding with default values."""
+    with patch("huckleberry_mcp.tools.feeding.get_authenticated_api", return_value=mock_api), \
+         patch("huckleberry_mcp.tools.children.get_authenticated_api", return_value=mock_api):
+
+        result = await feeding.log_bottle_feeding("child1", amount=4.0)
+
+        assert result["success"] is True
+        assert result["amount"] == 4.0
+        assert result["units"] == "oz"
+        assert result["bottle_content"] == "formula"
+        assert "interval_id" in result
+        assert "timestamp" in result
+
+
+@pytest.mark.asyncio
+async def test_log_bottle_feeding_breast_milk(mock_api):
+    """Test logging bottle feeding with breast milk."""
+    with patch("huckleberry_mcp.tools.feeding.get_authenticated_api", return_value=mock_api), \
+         patch("huckleberry_mcp.tools.children.get_authenticated_api", return_value=mock_api):
+
+        result = await feeding.log_bottle_feeding(
+            "child1",
+            amount=120,
+            bottle_content="breast_milk",
+            units="ml"
+        )
+
+        assert result["success"] is True
+        assert result["amount"] == 120
+        assert result["units"] == "ml"
+        assert result["bottle_content"] == "breast_milk"
+
+
+@pytest.mark.asyncio
+async def test_log_bottle_feeding_mixed(mock_api):
+    """Test logging bottle feeding with mixed content."""
+    with patch("huckleberry_mcp.tools.feeding.get_authenticated_api", return_value=mock_api), \
+         patch("huckleberry_mcp.tools.children.get_authenticated_api", return_value=mock_api):
+
+        result = await feeding.log_bottle_feeding(
+            "child1",
+            amount=5.5,
+            bottle_content="mixed",
+            units="oz"
+        )
+
+        assert result["success"] is True
+        assert result["amount"] == 5.5
+        assert result["bottle_content"] == "mixed"
+
+
+@pytest.mark.asyncio
+async def test_log_bottle_feeding_with_timestamp(mock_api):
+    """Test logging bottle feeding with retroactive timestamp."""
+    with patch("huckleberry_mcp.tools.feeding.get_authenticated_api", return_value=mock_api), \
+         patch("huckleberry_mcp.tools.children.get_authenticated_api", return_value=mock_api):
+
+        result = await feeding.log_bottle_feeding(
+            "child1",
+            amount=4.0,
+            timestamp="2024-01-01T14:30:00Z"
+        )
+
+        assert result["success"] is True
+        assert result["amount"] == 4.0
+        # Timestamp should be converted to local timezone
+        assert "2024-01-01" in result["timestamp"]
+
+
+@pytest.mark.asyncio
+async def test_log_bottle_feeding_invalid_content(mock_api):
+    """Test logging bottle feeding with invalid bottle_content raises error."""
+    with patch("huckleberry_mcp.tools.feeding.get_authenticated_api", return_value=mock_api), \
+         patch("huckleberry_mcp.tools.children.get_authenticated_api", return_value=mock_api):
+
+        with pytest.raises(ValueError, match="Invalid bottle_content"):
+            await feeding.log_bottle_feeding("child1", amount=4.0, bottle_content="water")
+
+
+@pytest.mark.asyncio
+async def test_log_bottle_feeding_invalid_units(mock_api):
+    """Test logging bottle feeding with invalid units raises error."""
+    with patch("huckleberry_mcp.tools.feeding.get_authenticated_api", return_value=mock_api), \
+         patch("huckleberry_mcp.tools.children.get_authenticated_api", return_value=mock_api):
+
+        with pytest.raises(ValueError, match="Invalid units"):
+            await feeding.log_bottle_feeding("child1", amount=4.0, units="cups")
+
+
+@pytest.mark.asyncio
+async def test_log_bottle_feeding_zero_amount(mock_api):
+    """Test logging bottle feeding with zero amount raises error."""
+    with patch("huckleberry_mcp.tools.feeding.get_authenticated_api", return_value=mock_api), \
+         patch("huckleberry_mcp.tools.children.get_authenticated_api", return_value=mock_api):
+
+        with pytest.raises(ValueError, match="Amount must be a positive number"):
+            await feeding.log_bottle_feeding("child1", amount=0)
+
+
+@pytest.mark.asyncio
+async def test_log_bottle_feeding_negative_amount(mock_api):
+    """Test logging bottle feeding with negative amount raises error."""
+    with patch("huckleberry_mcp.tools.feeding.get_authenticated_api", return_value=mock_api), \
+         patch("huckleberry_mcp.tools.children.get_authenticated_api", return_value=mock_api):
+
+        with pytest.raises(ValueError, match="Amount must be a positive number"):
+            await feeding.log_bottle_feeding("child1", amount=-2.5)
