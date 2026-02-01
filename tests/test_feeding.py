@@ -81,11 +81,12 @@ async def test_switch_feeding_side_success(mock_api):
 async def test_get_feeding_history(mock_api):
     """Test getting feeding history."""
     # Mock get_feed_intervals to return intervals with 'start' timestamp
+    # Backend returns duration in seconds
     mock_api.get_feed_intervals = MagicMock(return_value=[
         {
             "start": 1704103200,  # Unix timestamp
-            "leftDuration": 10,
-            "rightDuration": 15,
+            "leftDuration": 600,  # 600 seconds = 10 minutes
+            "rightDuration": 900,  # 900 seconds = 15 minutes
             "is_multi_entry": False
         }
     ])
@@ -96,8 +97,8 @@ async def test_get_feeding_history(mock_api):
         result = await feeding.get_feeding_history("child1", "2024-01-01", "2024-01-02")
 
         assert len(result) == 1
-        assert result[0]["left_duration_minutes"] == 10
-        assert result[0]["right_duration_minutes"] == 15
+        assert result[0]["left_duration_minutes"] == 10  # 600 seconds / 60 = 10 minutes
+        assert result[0]["right_duration_minutes"] == 15  # 900 seconds / 60 = 15 minutes
 
 
 @pytest.mark.asyncio
