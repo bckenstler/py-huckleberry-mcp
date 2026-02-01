@@ -27,7 +27,7 @@ from ..utils import iso_to_timestamp, iso_datetime_to_timestamp, timestamp_to_lo
 async def log_bottle_feeding(
     child_uid: str,
     amount: float,
-    bottle_content: str = "formula",
+    bottle_type: str = "Formula",
     units: str = "oz",
     timestamp: Optional[str] = None
 ) -> Dict[str, Any]:
@@ -40,7 +40,7 @@ async def log_bottle_feeding(
     Args:
         child_uid: The child's unique identifier (from list_children)
         amount: Amount fed (in the specified units)
-        bottle_content: What was fed - one of "formula", "breast_milk", or "mixed"
+        bottle_type: What was fed - one of "Formula", "Breast Milk", or "Mixed"
         units: Measurement units - "oz" (ounces) or "ml" (milliliters)
         timestamp: When the feeding occurred in ISO format (e.g., "2026-01-30T14:30:00").
                    Defaults to current time if not provided.
@@ -51,22 +51,22 @@ async def log_bottle_feeding(
         - message (str): Human-readable confirmation
         - amount (float): Amount fed
         - units (str): Measurement units used
-        - bottle_content (str): Type of feeding (formula, breast_milk, mixed)
+        - bottle_type (str): Type of feeding (Formula, Breast Milk, Mixed)
         - timestamp (str): Logged feeding time in local ISO format
         - interval_id (str): Unique identifier for this feeding record
 
     Raises:
-        ValueError: If bottle_content or units are invalid, or amount is not positive
+        ValueError: If bottle_type or units are invalid, or amount is not positive
         Exception: When API fails
     """
     try:
         await validate_child_uid(child_uid)
         api = await get_authenticated_api()
 
-        # Validate bottle_content
-        valid_contents = ["formula", "breast_milk", "mixed"]
-        if bottle_content not in valid_contents:
-            raise ValueError(f"Invalid bottle_content '{bottle_content}'. Must be one of: {', '.join(valid_contents)}")
+        # Validate bottle_type (case-sensitive to match Huckleberry backend)
+        valid_types = ["Formula", "Breast Milk", "Mixed"]
+        if bottle_type not in valid_types:
+            raise ValueError(f"Invalid bottle_type '{bottle_type}'. Must be one of: {', '.join(valid_types)}")
 
         # Validate units
         valid_units = ["oz", "ml"]
@@ -95,12 +95,13 @@ async def log_bottle_feeding(
         interval_id = f"{int(current_time * 1000)}-{uuid.uuid4().hex[:20]}"
 
         # Create interval document for bottle feeding
+        # Note: intervals use "amount" and "units" field names
         interval_data = {
             "mode": "bottle",
             "start": feed_timestamp,
             "amount": amount,
             "units": units,
-            "bottleContent": bottle_content,
+            "bottleType": bottle_type,
             "lastUpdated": current_time,
             "offset": api._get_timezone_offset_minutes(),
             "end_offset": api._get_timezone_offset_minutes(),
@@ -110,12 +111,13 @@ async def log_bottle_feeding(
         feed_ref.collection("intervals").document(interval_id).set(interval_data)
 
         # Update prefs.lastBottle (matching pattern from other feeding types)
+        # Note: prefs use "bottleAmount" and "bottleUnits" field names
         last_bottle_data = {
             "mode": "bottle",
             "start": feed_timestamp,
-            "amount": amount,
-            "units": units,
-            "bottleContent": bottle_content,
+            "bottleAmount": amount,
+            "bottleUnits": units,
+            "bottleType": bottle_type,
             "offset": api._get_timezone_offset_minutes(),
         }
 
@@ -127,10 +129,10 @@ async def log_bottle_feeding(
 
         return {
             "success": True,
-            "message": f"Bottle feeding logged: {amount}{units} of {bottle_content.replace('_', ' ')} for child {child_uid}",
+            "message": f"Bottle feeding logged: {amount}{units} of {bottle_type} for child {child_uid}",
             "amount": amount,
             "units": units,
-            "bottle_content": bottle_content,
+            "bottle_type": bottle_type,
             "timestamp": timestamp_to_local_iso(feed_timestamp, user_timezone),
             "interval_id": interval_id
         }

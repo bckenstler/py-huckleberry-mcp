@@ -252,7 +252,7 @@ async def test_log_bottle_feeding_success(mock_api):
         assert result["success"] is True
         assert result["amount"] == 4.0
         assert result["units"] == "oz"
-        assert result["bottle_content"] == "formula"
+        assert result["bottle_type"] == "Formula"
         assert "interval_id" in result
         assert "timestamp" in result
 
@@ -266,14 +266,14 @@ async def test_log_bottle_feeding_breast_milk(mock_api):
         result = await feeding.log_bottle_feeding(
             "child1",
             amount=120,
-            bottle_content="breast_milk",
+            bottle_type="Breast Milk",
             units="ml"
         )
 
         assert result["success"] is True
         assert result["amount"] == 120
         assert result["units"] == "ml"
-        assert result["bottle_content"] == "breast_milk"
+        assert result["bottle_type"] == "Breast Milk"
 
 
 @pytest.mark.asyncio
@@ -285,13 +285,13 @@ async def test_log_bottle_feeding_mixed(mock_api):
         result = await feeding.log_bottle_feeding(
             "child1",
             amount=5.5,
-            bottle_content="mixed",
+            bottle_type="Mixed",
             units="oz"
         )
 
         assert result["success"] is True
         assert result["amount"] == 5.5
-        assert result["bottle_content"] == "mixed"
+        assert result["bottle_type"] == "Mixed"
 
 
 @pytest.mark.asyncio
@@ -313,13 +313,13 @@ async def test_log_bottle_feeding_with_timestamp(mock_api):
 
 
 @pytest.mark.asyncio
-async def test_log_bottle_feeding_invalid_content(mock_api):
-    """Test logging bottle feeding with invalid bottle_content raises error."""
+async def test_log_bottle_feeding_invalid_type(mock_api):
+    """Test logging bottle feeding with invalid bottle_type raises error."""
     with patch("huckleberry_mcp.tools.feeding.get_authenticated_api", return_value=mock_api), \
          patch("huckleberry_mcp.tools.children.get_authenticated_api", return_value=mock_api):
 
-        with pytest.raises(ValueError, match="Invalid bottle_content"):
-            await feeding.log_bottle_feeding("child1", amount=4.0, bottle_content="water")
+        with pytest.raises(ValueError, match="Invalid bottle_type"):
+            await feeding.log_bottle_feeding("child1", amount=4.0, bottle_type="Water")
 
 
 @pytest.mark.asyncio
