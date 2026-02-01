@@ -1,4 +1,19 @@
-"""Feeding tracking tools for Huckleberry MCP server."""
+"""Feeding tracking tools for Huckleberry MCP server.
+
+Timer State Machine
+-------------------
+Feeding sessions follow this state machine: IDLE -> RUNNING <-> PAUSED -> COMPLETED/CANCELLED
+
+Valid operations by state:
+- start_breastfeeding: IDLE -> RUNNING (fails if session already active for this child)
+- pause_feeding: RUNNING -> PAUSED (fails if not running)
+- resume_feeding: PAUSED -> RUNNING (fails if not paused)
+- switch_feeding_side: RUNNING/PAUSED -> same state (fails if no active session)
+- complete_feeding: RUNNING/PAUSED -> saved to history (fails if no active session)
+- cancel_feeding: RUNNING/PAUSED -> discarded (fails if no active session)
+
+Only one feeding session can be active per child at a time.
+"""
 
 import time
 import uuid
@@ -19,10 +34,12 @@ async def log_breastfeeding(
 ) -> Dict[str, Any]:
     """
     Directly log a completed breastfeeding session without using the timer.
-    Useful for retroactive logging or importing past feeding data.
+
+    Useful for retroactive logging or importing past feeding data. Does not
+    require an active timer session.
 
     Args:
-        child_uid: The child's unique identifier
+        child_uid: The child's unique identifier (from list_children)
         start_time: Feeding start time in ISO format (e.g., "2026-01-30T14:30:00" or "2026-01-30T14:30:00Z")
         left_duration_minutes: Duration on left breast in minutes (optional)
         right_duration_minutes: Duration on right breast in minutes (optional)
@@ -30,10 +47,19 @@ async def log_breastfeeding(
         last_side: Which side finished on ("left" or "right"). Required if using end_time, optional otherwise.
 
     Returns:
-        Status message confirming feeding logged with details
+        Dict with keys:
+        - success (bool): True if feeding was logged
+        - message (str): Human-readable confirmation
+        - start_time (str): Logged start time in local ISO format
+        - left_duration_minutes (int): Duration on left breast
+        - right_duration_minutes (int): Duration on right breast
+        - total_duration_minutes (int): Combined duration from both sides
+        - last_side (str): Which side finished on ("left" or "right")
+        - interval_id (str): Unique identifier for this feeding record
 
     Raises:
-        ValueError: If invalid combination of parameters provided
+        ValueError: If invalid combination of parameters provided (e.g., both end_time and durations)
+        Exception: When API fails
     """
     try:
         await validate_child_uid(child_uid)
@@ -154,12 +180,23 @@ async def start_breastfeeding(child_uid: str, side: str) -> Dict[str, Any]:
     """
     Begin a breastfeeding tracking session.
 
+    Starts the feeding timer on the specified breast. Only one feeding session
+    can be active per child at a time.
+
     Args:
-        child_uid: The child's unique identifier
+        child_uid: The child's unique identifier (from list_children)
         side: Which side to start on ("left" or "right")
 
     Returns:
-        Status message confirming breastfeeding session started
+        Dict with keys:
+        - success (bool): True if session started
+        - message (str): Human-readable confirmation
+        - side (str): Which side feeding started on ("left" or "right")
+        - timestamp (str): Session start time in local ISO format
+
+    Raises:
+        ValueError: If side is not "left" or "right", or child_uid is invalid
+        Exception: If a feeding session is already active for this child, or API fails
     """
     try:
         await validate_child_uid(child_uid)
@@ -193,10 +230,20 @@ async def pause_feeding(child_uid: str) -> Dict[str, Any]:
     Pause an active feeding tracking session.
 
     Args:
-        child_uid: The child's unique identifier
+        child_uid: The child's unique identifier (from list_children)
 
     Returns:
-        Status message confirming feeding session paused
+        Dict with keys:
+        - success (bool): True if session paused
+        - message (str): Human-readable confirmation
+        - timestamp (str): Pause time in local ISO format
+
+    Raises:
+        ValueError: If child_uid is invalid
+        Exception: If no active (running) feeding session exists, or API fails
+
+    Precondition:
+        A feeding session must be active and running (started via start_breastfeeding, not paused).
     """
     try:
         await validate_child_uid(child_uid)
@@ -223,10 +270,20 @@ async def resume_feeding(child_uid: str) -> Dict[str, Any]:
     Resume a paused feeding tracking session.
 
     Args:
-        child_uid: The child's unique identifier
+        child_uid: The child's unique identifier (from list_children)
 
     Returns:
-        Status message confirming feeding session resumed
+        Dict with keys:
+        - success (bool): True if session resumed
+        - message (str): Human-readable confirmation
+        - timestamp (str): Resume time in local ISO format
+
+    Raises:
+        ValueError: If child_uid is invalid
+        Exception: If no paused feeding session exists, or API fails
+
+    Precondition:
+        A feeding session must be paused (via pause_feeding).
     """
     try:
         await validate_child_uid(child_uid)
@@ -252,11 +309,24 @@ async def switch_feeding_side(child_uid: str) -> Dict[str, Any]:
     """
     Switch between left and right breast during breastfeeding.
 
+    Toggles from left to right or right to left. The timer continues running
+    on the new side.
+
     Args:
-        child_uid: The child's unique identifier
+        child_uid: The child's unique identifier (from list_children)
 
     Returns:
-        Status message confirming side switched
+        Dict with keys:
+        - success (bool): True if side switched
+        - message (str): Human-readable confirmation
+        - timestamp (str): Switch time in local ISO format
+
+    Raises:
+        ValueError: If child_uid is invalid
+        Exception: If no active feeding session exists (running or paused), or API fails
+
+    Precondition:
+        A feeding session must be active (running or paused).
     """
     try:
         await validate_child_uid(child_uid)
@@ -282,11 +352,23 @@ async def complete_feeding(child_uid: str) -> Dict[str, Any]:
     """
     Complete and save a feeding tracking session.
 
+    Ends the active feeding session and saves it to the child's feeding history.
+
     Args:
-        child_uid: The child's unique identifier
+        child_uid: The child's unique identifier (from list_children)
 
     Returns:
-        Status message confirming feeding session completed
+        Dict with keys:
+        - success (bool): True if session completed and saved
+        - message (str): Human-readable confirmation
+        - timestamp (str): Completion time in local ISO format
+
+    Raises:
+        ValueError: If child_uid is invalid
+        Exception: If no active feeding session exists (running or paused), or API fails
+
+    Precondition:
+        A feeding session must be active (running or paused).
     """
     try:
         await validate_child_uid(child_uid)
@@ -312,11 +394,23 @@ async def cancel_feeding(child_uid: str) -> Dict[str, Any]:
     """
     Cancel and discard a feeding tracking session.
 
+    Ends the active feeding session without saving it. The session data is discarded.
+
     Args:
-        child_uid: The child's unique identifier
+        child_uid: The child's unique identifier (from list_children)
 
     Returns:
-        Status message confirming feeding session cancelled
+        Dict with keys:
+        - success (bool): True if session cancelled
+        - message (str): Human-readable confirmation
+        - timestamp (str): Cancellation time in local ISO format
+
+    Raises:
+        ValueError: If child_uid is invalid
+        Exception: If no active feeding session exists (running or paused), or API fails
+
+    Precondition:
+        A feeding session must be active (running or paused).
     """
     try:
         await validate_child_uid(child_uid)
@@ -347,12 +441,19 @@ async def get_feeding_history(
     Get feeding history for a child.
 
     Args:
-        child_uid: The child's unique identifier
-        start_date: Start date in ISO format (YYYY-MM-DD), optional
-        end_date: End date in ISO format (YYYY-MM-DD), optional
+        child_uid: The child's unique identifier (from list_children)
+        start_date: Start date in ISO format (YYYY-MM-DD), defaults to 7 days ago
+        end_date: End date in ISO format (YYYY-MM-DD), defaults to today
 
     Returns:
-        List of feeding events with details
+        List of dicts, each containing:
+        - start_time (str): Feeding start time in local ISO format
+        - left_duration_minutes (int): Duration on left breast in minutes
+        - right_duration_minutes (int): Duration on right breast in minutes
+        - is_multi_entry (bool): True if this was a batch-logged entry
+
+    Raises:
+        Exception: When API fails
     """
     try:
         await validate_child_uid(child_uid)

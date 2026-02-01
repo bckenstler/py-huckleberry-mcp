@@ -6,10 +6,18 @@ from ..auth import get_authenticated_api
 
 async def list_children() -> List[Dict[str, Any]]:
     """
-    List all child profiles.
+    List all child profiles registered in the Huckleberry account.
+
+    Use this tool first to get child_uid values needed by other tools.
 
     Returns:
-        List of children with uid, name, and birth_date.
+        List of dicts, each containing:
+        - uid (str): Unique identifier for the child, required by all other tools
+        - name (str): Child's display name
+        - birth_date (str): Child's birth date in ISO format
+
+    Raises:
+        Exception: When API authentication fails or request errors
     """
     try:
         api = await get_authenticated_api()
@@ -34,10 +42,13 @@ async def get_child_name(child_uid: str) -> Optional[str]:
     Get a child's name from their UID.
 
     Args:
-        child_uid: The child's unique identifier
+        child_uid: The child's unique identifier (from list_children)
 
     Returns:
-        The child's name, or None if not found
+        The child's name as a string, or None if child_uid not found
+
+    Raises:
+        Exception: When API authentication fails or request errors
     """
     try:
         api = await get_authenticated_api()

@@ -24,18 +24,28 @@ async def log_diaper(
     Log a diaper change.
 
     Args:
-        child_uid: The child's unique identifier
-        mode: Diaper mode ("pee", "poo", "both", "dry")
-        pee_amount: Pee amount ("little", "medium", "big"), optional
-        poo_amount: Poo amount ("little", "medium", "big"), optional
-        color: Color of poo if present ("yellow", "brown", "black", "green", "red", "gray")
-        consistency: Consistency of poo ("solid", "loose", "runny", "mucousy", "hard", "pebbles", "diarrhea")
-        diaper_rash: Whether baby has diaper rash
+        child_uid: The child's unique identifier (from list_children)
+        mode: Diaper mode - "pee", "poo", "both", or "dry"
+        pee_amount: Pee amount - "little", "medium", or "big" (optional)
+        poo_amount: Poo amount - "little", "medium", or "big" (optional)
+        color: Color of poo - "yellow", "brown", "black", "green", "red", or "gray" (optional)
+        consistency: Consistency of poo - "solid", "loose", "runny", "mucousy", "hard", "pebbles", or "diarrhea" (optional)
+        diaper_rash: Whether baby has diaper rash (default False)
         notes: Optional notes about this diaper change
         timestamp: Optional timestamp in ISO format for retroactive logging. If not provided, uses current time.
 
     Returns:
-        Status message confirming diaper logged
+        Dict with keys:
+        - success (bool): True if diaper change was logged
+        - message (str): Human-readable confirmation
+        - mode (str): The logged mode ("pee", "poo", "both", or "dry")
+        - color (str | None): Color if provided, None otherwise
+        - consistency (str | None): Consistency if provided, None otherwise
+        - timestamp (str): Logged time in local ISO format
+
+    Raises:
+        ValueError: If mode, color, consistency, or amount values are invalid
+        Exception: When API fails
     """
     try:
         await validate_child_uid(child_uid)
@@ -167,12 +177,20 @@ async def get_diaper_history(
     Get diaper change history for a child.
 
     Args:
-        child_uid: The child's unique identifier
-        start_date: Start date in ISO format (YYYY-MM-DD), optional
-        end_date: End date in ISO format (YYYY-MM-DD), optional
+        child_uid: The child's unique identifier (from list_children)
+        start_date: Start date in ISO format (YYYY-MM-DD), defaults to 7 days ago
+        end_date: End date in ISO format (YYYY-MM-DD), defaults to today
 
     Returns:
-        List of diaper change events with details
+        List of dicts, each containing:
+        - timestamp (str): Diaper change time in local ISO format
+        - mode (str): Diaper mode ("pee", "poo", "both", or "dry")
+        - color (str | None): Poo color if recorded, None otherwise
+        - consistency (str | None): Poo consistency if recorded, None otherwise
+        - notes (str | None): Notes if recorded, None otherwise
+
+    Raises:
+        Exception: When API fails
     """
     try:
         await validate_child_uid(child_uid)
