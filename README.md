@@ -1,5 +1,7 @@
 # Huckleberry MCP Server
 
+> **Disclaimer**: This is an unofficial, community-built project. It is not sponsored, endorsed, or supported by Huckleberry. Use at your own risk.
+
 A Model Context Protocol (MCP) server built with FastMCP that interfaces with the Huckleberry baby tracking API, enabling Claude to help you track your baby's sleep, feeding, diaper changes, and growth measurements through natural conversation.
 
 ## Features
